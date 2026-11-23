@@ -134,16 +134,40 @@ def write_report(run_dir):
 
 def write_contamination_report(run_dir: Path) -> Path:
     log = read_json(run_dir / "contamination.json")
+    revisions = []
+    for field, label in (
+        ("training_dataset_revision", "Training dataset revision"),
+        ("reference_dataset_revision", "Reference dataset revision"),
+    ):
+        if revision := log.get(field):
+            revisions.append(f"<p>{label} <code>{escape(revision)}</code></p>")
     steps = log["steps"]
     elapsed = log["elapsed_seconds"]
     overhead = elapsed - sum(step["elapsed_seconds"] for step in steps.values())
     rows = []
     score_sections = []
     for name, step in steps.items():
-        label = {"exact_match": "Exact match", "tfidf": "TF-IDF"}.get(name, name)
-        threshold = f'{step["threshold"]:g}' if "threshold" in step else "—"
+        label = {
+            "exact_match": "Exact match",
+            "tfidf": "TF-IDF",
+            "embedding": "Embedding",
+            "combined": "Combined (OR rejection)",
+            "sampling": "Random sampling",
+        }.get(name, name)
+        stage_label = escape(label)
+        if name == "embedding":
+            model_id = step.get("model_id", log.get("embedding_model_id"))
+            revision = step.get("model_revision", log.get("embedding_model_revision"))
+            if model_id:
+                stage_label += f"<br><small>Model: <code>{escape(model_id)}</code></small>"
+            if revision:
+                stage_label += f"<br><small>Revision: <code>{escape(revision)}</code></small>"
+        threshold = "—"
+        if "threshold" in step:
+            value = step["threshold"]
+            threshold = "Calibration only" if value is None else f"{value:g}"
         rows.append(
-            f'<tr><th scope="row">{escape(label)}</th><td>{step["input_count"]:,}</td>'
+            f'<tr><th scope="row">{stage_label}</th><td>{step["input_count"]:,}</td>'
             f'<td>{step["passed_count"]:,}</td><td>{step["rejected_count"]:,}</td>'
             f'<td>{threshold}</td><td>{step["elapsed_seconds"]:.4f} s</td></tr>'
         )
@@ -186,6 +210,7 @@ def write_contamination_report(run_dir: Path) -> Path:
 <body>
 <main>
   <h1>Contamination report</h1>
+  {''.join(revisions)}
   <p>{log["reference_count"]:,} reference texts · {elapsed:.4f} s total · {overhead:.4f} s between stages and bookkeeping</p>
   <div class="table-wrap">
     <table>
@@ -195,7 +220,6 @@ def write_contamination_report(run_dir: Path) -> Path:
     </table>
   </div>
   {''.join(score_sections)}
-  <p><a href="contamination.json">View raw JSON</a></p>
 </main>
 </body>
 </html>
