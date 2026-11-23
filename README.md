@@ -28,7 +28,9 @@ magicoder = load_magicoder_python_dataset()
 mbpp = load_mbpp_dataset()
 model_id = "Alibaba-NLP/gte-modernbert-base"
 revision = "e7f32e3c00f91d699e8c43b53106206bcc72bb22"
-model = SentenceTransformer(model_id, revision=revision)
+model = SentenceTransformer(
+    model_id, revision=revision, device="cuda", model_kwargs={"dtype": "float32"},
+)
 
 filterer = ContaminationFilter()
 indices = filterer.filter_contamination(
@@ -40,6 +42,10 @@ indices = filterer.filter_contamination(
     embedding_threshold=0.75,
     embedding_model_id=model_id,
     embedding_model_revision=revision,
+    embedding_encode_settings={
+        "batch_size": 16, "device": "cuda", "dtype": "float32",
+        "max_seq_length": model.max_seq_length,
+    },
     max_samples=512,
     random_seed=42,
     generate_report=True,
@@ -53,4 +59,10 @@ Set `embedding_threshold=None` to inspect scores before choosing an embedding th
 
 The latest log is available as `filterer.contamination_log`. Optional dataset revisions can be recorded with `training_dataset_revision` and `reference_dataset_revision`.
 
-With `generate_report=True`, [report.py](report.py) creates `contamination_runs/<UTC-timestamp>/report.html` alongside the full `contamination.json` log. The HTML shows thresholds, counts, timings, and up to 100 highest-scoring prompt pairs per similarity method. By default, the log stays in memory.
+With `generate_report=True`, [report.py](report.py) writes `contamination_runs/<UTC-timestamp>/report.html` and `contamination.json`. The HTML shows thresholds, counts, total runtime, score generation time when scores are computed, and up to 100 highest-scoring prompt pairs per method. The run log also records the scoring hash, cache status, and selected indices.
+
+## Score cache
+
+The filter looks up `score_cache/<scoring_hash>/` directly. Each entry contains `config.json` and `scores.json`. The key includes the ordered prompts, scoring version, TF-IDF settings, and embedding configuration. Thresholds and sampling settings can change without recomputing scores.
+
+To cache embedding scores, supply the model ID, its full commit hash, and the settings that affect encoder output. The settings describe the encoder supplied by the caller. An embedding encoder without that metadata runs without caching. Cache files can be written with `generate_report=False`. To list stored configurations, inspect `score_cache/*/config.json`.

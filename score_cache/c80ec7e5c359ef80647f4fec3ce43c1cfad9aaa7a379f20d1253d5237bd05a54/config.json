@@ -1,0 +1,58 @@
+{
+  "scoring_hash": "c80ec7e5c359ef80647f4fec3ce43c1cfad9aaa7a379f20d1253d5237bd05a54",
+  "scoring_config": {
+    "embedding": {
+      "encode_settings": {
+        "attn_implementation": "sdpa",
+        "batch_size": 16,
+        "device": "cuda",
+        "dtype": "bfloat16",
+        "max_seq_length": 8192,
+        "sentence_transformers_version": "6.3.0",
+        "torch_version": "2.14.1+cu130",
+        "transformers_version": "5.23.0"
+      },
+      "model_id": "Alibaba-NLP/gte-modernbert-base",
+      "model_revision": "e7f32e3c00f91d699e8c43b53106206bcc72bb22"
+    },
+    "libraries": {
+      "numpy": "2.5.5",
+      "scikit-learn": "1.9.1",
+      "scipy": "1.18.1"
+    },
+    "reference_text_hash": "fe7af70bc3f266ca998e85b2474e60f79296c2e85c2c6d13e8455eb0542b527c",
+    "tfidf": {
+      "analyzer": "word",
+      "binary": false,
+      "decode_error": "strict",
+      "dtype": "float32",
+      "encoding": "utf-8",
+      "input": "content",
+      "lowercase": true,
+      "max_df": 1.0,
+      "max_features": null,
+      "min_df": 1,
+      "ngram_range": [
+        1,
+        2
+      ],
+      "norm": "l2",
+      "preprocessor": null,
+      "smooth_idf": true,
+      "stop_words": null,
+      "strip_accents": null,
+      "sublinear_tf": false,
+      "token_pattern": "(?u)\\b\\w\\w+\\b",
+      "tokenizer": null,
+      "use_idf": true,
+      "vocabulary": null
+    },
+    "training_text_hash": "3effb41f56476423b234cb63b932a10e67cf52160866495c5ccd9003318ff09b",
+    "unicode_version": "16.0.0",
+    "version": 1
+  },
+  "dataset_revisions": {
+    "training": "5f839b1f368a76b161028bb9edff055db34022b2",
+    "reference": "4bb6404fdc6cacfda99d4ac4205087b89d32030c"
+  }
+}

@@ -132,8 +132,31 @@ def write_report(run_dir):
     return output_path
 
 
-def write_contamination_report(run_dir: Path) -> Path:
+def write_contamination_report(
+    run_dir: Path,
+    training_texts: list[str] | None = None,
+    reference: list[str] | None = None,
+    *,
+    scores: dict | None = None,
+) -> Path:
     log = read_json(run_dir / "contamination.json")
+    scoring_hash = log.get("scoring_hash")
+    if scores is None and scoring_hash:
+        from score_cache import read_scores
+
+        scores = read_scores(scoring_hash)
+    score_matches = scores["matches"] if scores is not None else {}
+    cache_info = ""
+    if "cache_hit" in log:
+        cache_status = {
+            True: "Reused cached scores",
+            False: "Computed and cached scores",
+            None: "Computed scores without caching",
+        }[log["cache_hit"]]
+        cache_key = f" · <code>{escape(scoring_hash)}</code>" if scoring_hash else ""
+        generation_time = log.get("score_generation_elapsed_seconds") if not log["cache_hit"] else None
+        duration = f" · {generation_time:.4f} s score generation" if generation_time is not None else ""
+        cache_info = f"<p>{cache_status}{cache_key}{duration}</p>"
     revisions = []
     for field, label in (
         ("training_dataset_revision", "Training dataset revision"),
@@ -143,7 +166,6 @@ def write_contamination_report(run_dir: Path) -> Path:
             revisions.append(f"<p>{label} <code>{escape(revision)}</code></p>")
     steps = log["steps"]
     elapsed = log["elapsed_seconds"]
-    overhead = elapsed - sum(step["elapsed_seconds"] for step in steps.values())
     rows = []
     score_sections = []
     for name, step in steps.items():
@@ -169,18 +191,22 @@ def write_contamination_report(run_dir: Path) -> Path:
         rows.append(
             f'<tr><th scope="row">{stage_label}</th><td>{step["input_count"]:,}</td>'
             f'<td>{step["passed_count"]:,}</td><td>{step["rejected_count"]:,}</td>'
-            f'<td>{threshold}</td><td>{step["elapsed_seconds"]:.4f} s</td></tr>'
+            f'<td>{threshold}</td></tr>'
         )
-        if "best_matches" in step:
-            matches = step["best_matches"]
+        if name in score_matches or "best_matches" in step:
+            matches = score_matches[name] if name in score_matches else step["best_matches"]
             top_matches = sorted(matches, key=lambda match: match["similarity"], reverse=True)[:100]
-            match_text = "\n\n".join(
-                f'Magicoder [{match["training_index"]}] · MBPP [{match["reference_index"]}] '
-                f'· similarity {match["similarity"]:.8g}\n'
-                f'Magicoder prompt:\n{match["training_prompt"]}\n\n'
-                f'MBPP prompt:\n{match["reference_prompt"]}'
-                for match in top_matches
-            )
+            match_lines = []
+            for match in top_matches:
+                training_index = match["training_index"]
+                reference_index = match["reference_index"]
+                text = f'Magicoder [{training_index}] · MBPP [{reference_index}] · similarity {match["similarity"]:.8g}'
+                if training_texts is not None and reference is not None:
+                    text += f"\nMagicoder prompt:\n{training_texts[training_index]}\n\nMBPP prompt:\n{reference[reference_index]}"
+                elif "training_prompt" in match:
+                    text += f'\nMagicoder prompt:\n{match["training_prompt"]}\n\nMBPP prompt:\n{match["reference_prompt"]}'
+                match_lines.append(text)
+            match_text = "\n\n".join(match_lines)
             heading = f"{label} best matches ({len(top_matches):,} of {len(matches):,})"
             score_sections.append(details(heading, match_text or "No matches recorded."))
         elif "similarities" in step:
@@ -211,11 +237,12 @@ def write_contamination_report(run_dir: Path) -> Path:
 <main>
   <h1>Contamination report</h1>
   {''.join(revisions)}
-  <p>{log["reference_count"]:,} reference texts · {elapsed:.4f} s total · {overhead:.4f} s between stages and bookkeeping</p>
+  {cache_info}
+  <p>{log["reference_count"]:,} reference texts · {elapsed:.4f} s total</p>
   <div class="table-wrap">
     <table>
       <thead><tr><th scope="col">Stage</th><th scope="col">Input</th><th scope="col">Kept</th>
-        <th scope="col">Rejected</th><th scope="col">Threshold</th><th scope="col">Duration</th></tr></thead>
+        <th scope="col">Rejected</th><th scope="col">Threshold</th></tr></thead>
       <tbody>{''.join(rows)}</tbody>
     </table>
   </div>
