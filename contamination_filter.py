@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import unicodedata
 from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -9,23 +8,7 @@ from math import isclose
 from pathlib import Path
 from random import Random
 from time import perf_counter
-from typing import TYPE_CHECKING
-
-from score_cache import read_scores, scoring_key, write_scores
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
-
-    from numpy.typing import ArrayLike
-    from sklearn.feature_extraction.text import TfidfVectorizer
-
-
-SIMILARITY_BATCH_SIZE = 256
-
-
-def normalize(text: str) -> str:
-    text = unicodedata.normalize("NFKC", text)
-    return " ".join(text.casefold().split())
+from score_cache import ScoreRecord, hash_texts
 
 
 @dataclass
@@ -48,7 +31,7 @@ class EmbeddingStepLog(SimilarityStepLog):
 
 @dataclass
 class ContaminationLog:
-    reference_count: int = 0
+    reference_count: int | None = None
     scoring_hash: str | None = None
     cache_hit: bool | None = None
     score_generation_elapsed_seconds: float | None = None
@@ -68,88 +51,85 @@ class ContaminationFilter:
     def __init__(self):
         self.contamination_log = ContaminationLog()
 
-    def filter_contamination(
+    def filter_scores(
         self,
+        record: ScoreRecord,
         training_texts: list[str],
-        reference: list[str],
-        vectorizer: TfidfVectorizer,
-        similarity_threshold: float = 0.45,
-        notify_on_steps: bool = False,
-        generate_report: bool = False,
         *,
-        embedding_encoder: Callable[[list[str]], ArrayLike] | None = None,
+        reference: list[str] | None = None,
+        similarity_threshold: float = 0.45,
         embedding_threshold: float | None = None,
-        embedding_model_id: str | None = None,
-        embedding_model_revision: str | None = None,
-        embedding_encode_settings: dict[str, object] | None = None,
         max_samples: int | None = None,
         random_seed: int | None = None,
+        notify_on_steps: bool = False,
+        generate_report: bool = False,
         training_dataset_metadata: dict[str, object] | None = None,
         reference_dataset_metadata: dict[str, object] | None = None,
     ) -> list[int]:
-        """Return kept training indices, optionally sampled uniformly without replacement."""
-        # Validation
+        """Apply thresholds and sample original training indices from precomputed scores."""
+        started = perf_counter()
+        scores = record.scores
+        self._validate_selection(
+            similarity_threshold, embedding_threshold, max_samples, "embedding" in scores["matches"],
+        )
+        if hash_texts(training_texts) != record.training_text_hash:
+            raise ValueError("Training prompts do not match the cached scoring inputs.")
+        if reference is not None and hash_texts(reference) != record.reference_text_hash:
+            raise ValueError("Reference prompts do not match the cached scoring inputs.")
+
+        self.contamination_log = ContaminationLog(
+            reference_count=len(reference) if reference is not None else scores.get("reference_count"),
+            scoring_hash=record.scoring_hash,
+            cache_hit=record.cache_hit,
+            score_generation_elapsed_seconds=None if record.cache_hit else scores["elapsed_seconds"],
+            max_samples=max_samples,
+            random_seed=random_seed,
+            training_dataset_metadata=deepcopy(
+                record.dataset_metadata.get("training") if training_dataset_metadata is None else training_dataset_metadata,
+            ),
+            reference_dataset_metadata=deepcopy(
+                record.dataset_metadata.get("reference") if reference_dataset_metadata is None else reference_dataset_metadata,
+            ),
+        )
+
+        kept = self._select_indices(
+            scores, len(training_texts), similarity_threshold, embedding_threshold,
+            record.embedding.get("model_id"), record.embedding.get("model_revision"),
+            max_samples, random_seed, notify_on_steps,
+        )
+        self.contamination_log.elapsed_seconds = perf_counter() - started
+
+        if generate_report:
+            from report import write_contamination_report
+
+            timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+            run_dir = Path(__file__).resolve().parent / "contamination_runs" / timestamp
+            run_dir.mkdir(parents=True)
+            self.contamination_log.write_json(run_dir / "contamination.json")
+            write_contamination_report(run_dir, training_texts, reference, scores=scores)
+        return kept
+
+    @staticmethod
+    def _validate_selection(similarity_threshold, embedding_threshold, max_samples, has_embedding):
         if not 0 < similarity_threshold <= 1:
             raise ValueError("The TF-IDF similarity threshold must be in (0, 1].")
         if embedding_threshold is not None:
-            if embedding_encoder is None:
-                raise ValueError("An embedding encoder is required when setting an embedding threshold.")
+            if not has_embedding:
+                raise ValueError("The score record must contain embedding scores to apply an embedding threshold.")
             if not -1 <= embedding_threshold <= 1:
                 raise ValueError("The embedding similarity threshold must be in [-1, 1].")
         if max_samples is not None and max_samples < 0:
             raise ValueError("max_samples must be nonnegative.")
 
-        filtering_started = perf_counter()
-        self.contamination_log = ContaminationLog(
-            reference_count=len(reference), max_samples=max_samples, random_seed=random_seed,
-            training_dataset_metadata=deepcopy(training_dataset_metadata),
-            reference_dataset_metadata=deepcopy(reference_dataset_metadata),
-        )
-
-        # Score cache
-        embedding_config = None
-        cacheable = embedding_encoder is None
-        if embedding_encoder is not None and embedding_model_id and embedding_model_revision:
-            cacheable = (
-                len(embedding_model_revision) == 40
-                and all(char in "0123456789abcdef" for char in embedding_model_revision)
-                and embedding_encode_settings is not None
-            )
-            embedding_config = {
-                "model_id": embedding_model_id,
-                "model_revision": embedding_model_revision,
-                "encode_settings": embedding_encode_settings,
-            }
-        cache_key = scoring_key(training_texts, reference, vectorizer, embedding_config) if cacheable else None
-        scores = None
-        if cache_key is not None:
-            scoring_hash, config = cache_key
-            scores = read_scores(scoring_hash)
-            self.contamination_log.scoring_hash = scoring_hash
-            self.contamination_log.cache_hit = scores is not None
-            if notify_on_steps:
-                status = "hit" if scores is not None else "miss"
-                print(f"Score cache {status} ({scoring_hash}).", flush=True)
-        elif notify_on_steps:
-            print("Score cache skipped because the scoring configuration has no stable cache key.", flush=True)
-
-        # Score generation
-        if scores is None:
-            scores = self._generate_scores(
-                training_texts, reference, vectorizer, embedding_encoder, notify_on_steps,
-            )
-            self.contamination_log.score_generation_elapsed_seconds = scores["elapsed_seconds"]
-            if cache_key is not None:
-                write_scores(scoring_hash, config, scores, {
-                    "training": self.contamination_log.training_dataset_metadata,
-                    "reference": self.contamination_log.reference_dataset_metadata,
-                })
-
+    def _select_indices(
+        self, scores, training_count, similarity_threshold, embedding_threshold,
+        embedding_model_id, embedding_model_revision, max_samples, random_seed, notify_on_steps,
+    ):
         # Exact match
         exact_rejected = set(scores["exact_rejected_indices"])
-        exact_kept = [index for index in range(len(training_texts)) if index not in exact_rejected]
+        exact_kept = [index for index in range(training_count) if index not in exact_rejected]
         self.contamination_log.steps["exact_match"] = ContaminationStepLog(
-            input_count=len(training_texts),
+            input_count=training_count,
             passed_count=len(exact_kept),
             rejected_count=len(exact_rejected),
         )
@@ -162,7 +142,7 @@ class ContaminationFilter:
 
         # Embedding
         embedding_kept = exact_kept
-        if embedding_encoder is not None:
+        if "embedding" in scores["matches"]:
             if notify_on_steps and embedding_threshold is not None:
                 print(f"Applying embedding threshold {embedding_threshold:g}.", flush=True)
             embedding_kept, embedding_log = self._apply_threshold(
@@ -200,17 +180,6 @@ class ContaminationFilter:
             )
 
         self.contamination_log.selected_indices = kept_indices.copy()
-        self.contamination_log.elapsed_seconds = perf_counter() - filtering_started
-
-        # Report
-        if generate_report:
-            from report import write_contamination_report
-
-            timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
-            run_dir = Path(__file__).resolve().parent / "contamination_runs" / timestamp
-            run_dir.mkdir(parents=True)
-            self.contamination_log.write_json(run_dir / "contamination.json")
-            write_contamination_report(run_dir, training_texts, reference, scores=scores)
         return kept_indices
 
     @staticmethod
@@ -240,95 +209,3 @@ class ContaminationFilter:
             passed_count=len(kept),
             rejected_count=len(kept_indices) - len(kept),
         )
-
-    def _generate_scores(self, training_texts, reference, vectorizer, embedding_encoder, notify):
-        started = perf_counter()
-        if notify:
-            print(f"Starting exact match ({len(training_texts)} texts).", flush=True)
-        exact_kept = self._filter_exact(training_texts, reference)
-        kept_set = set(exact_kept)
-        rejected = [index for index in range(len(training_texts)) if index not in kept_set]
-        if notify:
-            print(f"Finished exact match ({len(exact_kept)} kept).", flush=True)
-
-        remaining = [training_texts[index] for index in exact_kept]
-        scorers = [("tfidf", "TF-IDF", lambda: self._score_tfidf(remaining, reference, vectorizer))]
-        if embedding_encoder is not None:
-            scorers.append((
-                "embedding", "Embedding",
-                lambda: self._score_embeddings(remaining, reference, embedding_encoder),
-            ))
-
-        matches = {}
-        for name, label, scorer in scorers:
-            if notify:
-                print(f"Starting {label} scoring ({len(remaining)} texts).", flush=True)
-            similarities, reference_indices = scorer()
-            matches[name] = [
-                {"training_index": index, "reference_index": ref, "similarity": score}
-                for index, (ref, score) in zip(exact_kept, zip(reference_indices, similarities, strict=True))
-            ]
-            if notify:
-                print(f"Finished {label} scoring.", flush=True)
-        return {
-            "exact_rejected_indices": rejected,
-            "matches": matches,
-            "elapsed_seconds": perf_counter() - started,
-        }
-
-    def _filter_exact(self, training_texts: list[str], reference: list[str]) -> list[int]:
-        normalized_reference = {normalize(text) for text in reference}
-        return [
-            index for index, text in enumerate(training_texts)
-            if normalize(text) not in normalized_reference
-        ]
-
-    def _score_tfidf(
-        self,
-        training_texts: list[str],
-        reference: list[str],
-        vectorizer: TfidfVectorizer,
-    ) -> tuple[list[float], list[int]]:
-        training_count = len(training_texts)
-        if not training_texts or not reference:
-            return [], []
-
-        from sklearn.metrics.pairwise import cosine_similarity
-
-        vectors = vectorizer.fit_transform(training_texts + reference)
-        reference_vectors = vectors[training_count:]
-        scores = []
-        reference_indices = []
-        for start in range(0, training_count, SIMILARITY_BATCH_SIZE):
-            stop = min(start + SIMILARITY_BATCH_SIZE, training_count)
-            batch = vectors[start:stop]
-            similarities = cosine_similarity(batch, reference_vectors, dense_output=False)
-            reference_indices.extend(similarities.argmax(axis=1).A1.tolist())
-            scores.extend(similarities.max(axis=1).toarray().ravel().tolist())
-        return scores, reference_indices
-
-    def _score_embeddings(
-        self, training_texts: list[str], reference: list[str],
-        encoder: Callable[[list[str]], ArrayLike],
-    ) -> tuple[list[float], list[int]]:
-        if not training_texts or not reference:
-            return [], []
-
-        from numpy import arange, asarray
-        from sklearn.metrics.pairwise import cosine_similarity
-
-        reference_vectors = asarray(encoder(reference))
-        if reference_vectors.ndim != 2 or len(reference_vectors) != len(reference):
-            raise ValueError("The embedding encoder must return one vector per reference text.")
-        scores = []
-        reference_indices = []
-        for start in range(0, len(training_texts), SIMILARITY_BATCH_SIZE):
-            texts = training_texts[start:start + SIMILARITY_BATCH_SIZE]
-            vectors = asarray(encoder(texts))
-            if vectors.ndim != 2 or len(vectors) != len(texts):
-                raise ValueError("The embedding encoder must return one vector per training text.")
-            similarities = cosine_similarity(vectors, reference_vectors)
-            best_indices = similarities.argmax(axis=1)
-            reference_indices.extend(best_indices.tolist())
-            scores.extend(similarities[arange(len(texts)), best_indices].clip(-1, 1).tolist())
-        return scores, reference_indices

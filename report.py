@@ -255,6 +255,8 @@ def write_contamination_report(
         cache_info = f"<p>{cache_status}{cache_key}{duration}</p>"
     steps = log["steps"]
     elapsed = log["elapsed_seconds"]
+    reference_count = log.get("reference_count")
+    reference_summary = f"{reference_count:,} reference texts · " if reference_count is not None else ""
     rows = []
     for name, step in steps.items():
         label = {
@@ -310,7 +312,7 @@ def write_contamination_report(
   <h1>Contamination report</h1>
   {render_dataset_metadata(datasets)}
   {cache_info}
-  <p>{log["reference_count"]:,} reference texts · {elapsed:.4f} s total</p>
+  <p>{reference_summary}{elapsed:.4f} s total</p>
   <div class="table-wrap">
     <table>
       <thead><tr><th scope="col">Stage</th><th scope="col">Input</th><th scope="col">Kept</th>

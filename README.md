@@ -4,7 +4,7 @@
 
 ## How it works
 
-[ContaminationFilter](contamination_filter.py) applies these steps:
+[ContaminationScorer](contamination_scorer.py) produces scores. [ContaminationFilter](contamination_filter.py) applies thresholds and samples the remaining rows.
 
 1. **Exact match.** Apply Unicode NFKC, case folding, and whitespace normalization. Use a set of normalized reference prompts to detect duplicates.
 2. **TF-IDF and embeddings.** Score the same remaining prompts independently with each method. TF-IDF captures lexical overlap with sparse vectors. Optional embeddings capture semantic overlap with dense vectors. Both use batched cosine similarity and record the highest-scoring reference for each prompt.
@@ -22,6 +22,7 @@ from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 from contamination_filter import ContaminationFilter
+from contamination_scorer import ContaminationScorer
 from dataset_loader import load_magicoder_python_dataset, load_mbpp_dataset
 
 magicoder = load_magicoder_python_dataset()
@@ -32,14 +33,13 @@ model = SentenceTransformer(
     model_id, revision=revision, device="cuda", model_kwargs={"dtype": "float32"},
 )
 
-filterer = ContaminationFilter()
-indices = filterer.filter_contamination(
-    list(magicoder["problem"]),
-    list(mbpp["test"]["text"]),
+training_texts = list(magicoder["problem"])
+reference = list(mbpp["test"]["text"])
+record = ContaminationScorer().get_or_create_scores(
+    training_texts,
+    reference,
     TfidfVectorizer(ngram_range=(1, 2), dtype=float32),
-    similarity_threshold=0.45,
     embedding_encoder=partial(model.encode, batch_size=16, show_progress_bar=False),
-    embedding_threshold=0.75,
     embedding_model_id=model_id,
     embedding_model_revision=revision,
     embedding_encode_settings={
@@ -54,6 +54,14 @@ indices = filterer.filter_contamination(
         "name": "google-research-datasets/mbpp",
         "selection": {"config": "full", "split": "test", "text_column": "text"},
     },
+)
+filterer = ContaminationFilter()
+indices = filterer.filter_scores(
+    record,
+    training_texts,
+    reference=reference,
+    similarity_threshold=0.45,
+    embedding_threshold=0.75,
     max_samples=512,
     random_seed=42,
     generate_report=True,
@@ -71,6 +79,6 @@ With `generate_report=True`, [report.py](report.py) writes `contamination_runs/<
 
 ## Score cache
 
-The filter looks up `score_cache/<scoring_hash>/` directly. Each entry contains `config.json` and `scores.json`. Report generation adds a shared `report.html` to the entry. For an uncached run, the score report is saved as `scores.html` next to the run report. The key includes the ordered prompts, scoring version, TF-IDF settings, and embedding configuration. Thresholds and sampling settings can change without recomputing scores.
+The scorer looks up `score_cache/<scoring_hash>/` directly. Each entry contains `config.json` and `scores.json`. Use `score_cache.load_score_record(hash)` to load a known entry without a model or vectorizer. Report generation adds a shared `report.html` to the entry. For an uncached run, the score report is saved as `scores.html` next to the run report. The key includes the ordered prompts, scoring version, TF-IDF settings, and embedding configuration. Thresholds and sampling settings can change without recomputing scores.
 
 To cache embedding scores, supply the model ID, its full commit hash, and the settings that affect encoder output. The settings describe the encoder supplied by the caller. An embedding encoder without that metadata runs without caching. Cache files can be written with `generate_report=False`. To list stored configurations, inspect `score_cache/*/config.json`.
