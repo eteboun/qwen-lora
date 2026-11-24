@@ -51,8 +51,24 @@
     "unicode_version": "16.0.0",
     "version": 1
   },
-  "dataset_revisions": {
-    "training": "5f839b1f368a76b161028bb9edff055db34022b2",
-    "reference": "4bb6404fdc6cacfda99d4ac4205087b89d32030c"
+  "dataset_metadata": {
+    "training": {
+      "name": "ise-uiuc/Magicoder-OSS-Instruct-75K",
+      "revision": "5f839b1f368a76b161028bb9edff055db34022b2",
+      "selection": {
+        "split": "train",
+        "text_column": "problem",
+        "filter": "lang == \"python\""
+      }
+    },
+    "reference": {
+      "name": "google-research-datasets/mbpp",
+      "revision": "4bb6404fdc6cacfda99d4ac4205087b89d32030c",
+      "selection": {
+        "config": "full",
+        "split": "test",
+        "text_column": "text"
+      }
+    }
   }
 }

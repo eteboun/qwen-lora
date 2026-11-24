@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import unicodedata
+from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from math import isclose
@@ -56,8 +57,8 @@ class ContaminationLog:
     steps: dict[str, ContaminationStepLog] = field(default_factory=dict)
     max_samples: int | None = None
     random_seed: int | None = None
-    training_dataset_revision: str | None = None
-    reference_dataset_revision: str | None = None
+    training_dataset_metadata: dict[str, object] | None = None
+    reference_dataset_metadata: dict[str, object] | None = None
 
     def write_json(self, path: str | Path) -> None:
         Path(path).write_text(json.dumps(asdict(self), indent=2) + "\n", encoding="utf-8")
@@ -83,8 +84,8 @@ class ContaminationFilter:
         embedding_encode_settings: dict[str, object] | None = None,
         max_samples: int | None = None,
         random_seed: int | None = None,
-        training_dataset_revision: str | None = None,
-        reference_dataset_revision: str | None = None,
+        training_dataset_metadata: dict[str, object] | None = None,
+        reference_dataset_metadata: dict[str, object] | None = None,
     ) -> list[int]:
         """Return kept training indices, optionally sampled uniformly without replacement."""
         # Validation
@@ -101,8 +102,8 @@ class ContaminationFilter:
         filtering_started = perf_counter()
         self.contamination_log = ContaminationLog(
             reference_count=len(reference), max_samples=max_samples, random_seed=random_seed,
-            training_dataset_revision=training_dataset_revision,
-            reference_dataset_revision=reference_dataset_revision,
+            training_dataset_metadata=deepcopy(training_dataset_metadata),
+            reference_dataset_metadata=deepcopy(reference_dataset_metadata),
         )
 
         # Score cache
@@ -140,8 +141,8 @@ class ContaminationFilter:
             self.contamination_log.score_generation_elapsed_seconds = scores["elapsed_seconds"]
             if cache_key is not None:
                 write_scores(scoring_hash, config, scores, {
-                    "training": training_dataset_revision,
-                    "reference": reference_dataset_revision,
+                    "training": self.contamination_log.training_dataset_metadata,
+                    "reference": self.contamination_log.reference_dataset_metadata,
                 })
 
         # Exact match

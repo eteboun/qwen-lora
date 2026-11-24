@@ -61,13 +61,13 @@ def read_scores(scoring_hash):
     return json.loads((entry / "scores.json").read_text(encoding="utf-8"))
 
 
-def write_scores(scoring_hash, config, scores, dataset_revisions):
+def write_scores(scoring_hash, config, scores, dataset_metadata):
     SCORE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
     destination = SCORE_CACHE_DIR / scoring_hash
     metadata = {
         "scoring_hash": scoring_hash,
         "scoring_config": config,
-        "dataset_revisions": dataset_revisions,
+        "dataset_metadata": dataset_metadata,
     }
     with TemporaryDirectory(dir=SCORE_CACHE_DIR) as temporary:
         staging = Path(temporary) / "entry"

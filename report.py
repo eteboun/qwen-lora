@@ -1,7 +1,9 @@
 import argparse
 import json
 from html import escape
+from os.path import relpath
 from pathlib import Path
+from urllib.parse import quote
 
 
 RUNS_DIR = Path(__file__).resolve().parent / "baseline_runs"
@@ -132,6 +134,70 @@ def write_report(run_dir):
     return output_path
 
 
+def render_dataset_metadata(datasets):
+    sections = []
+    for role, label in (("training", "Training dataset"), ("reference", "Reference dataset")):
+        metadata = datasets.get(role)
+        if not metadata:
+            continue
+        fields = [(key, metadata[key]) for key in ("name", "revision") if metadata.get(key)]
+        fields.extend(metadata.get("selection", {}).items())
+        values = " · ".join(
+            f"{escape(key.replace('_', ' ').capitalize())} <code>{escape(str(value))}</code>"
+            for key, value in fields
+        )
+        if values:
+            sections.append(f"<p><strong>{label}</strong> · {values}</p>")
+    return "".join(sections)
+
+
+def write_score_report(
+    output_path, matches_by_method, training_texts=None, reference=None, *, dataset_metadata=None,
+):
+    sections = []
+    for name, label in (("tfidf", "TF-IDF"), ("embedding", "Embedding")):
+        if name not in matches_by_method:
+            continue
+        matches = matches_by_method[name]
+        top_matches = sorted(matches, key=lambda match: match["similarity"], reverse=True)[:100]
+        lines = []
+        for match in top_matches:
+            training_index = match["training_index"]
+            reference_index = match["reference_index"]
+            text = f'Magicoder [{training_index}] · MBPP [{reference_index}] · similarity {match["similarity"]:.8g}'
+            if training_texts is not None and reference is not None:
+                text += f"\nMagicoder prompt:\n{training_texts[training_index]}\n\nMBPP prompt:\n{reference[reference_index]}"
+            elif "training_prompt" in match:
+                text += f'\nMagicoder prompt:\n{match["training_prompt"]}\n\nMBPP prompt:\n{match["reference_prompt"]}'
+            lines.append(text)
+        heading = f"{label} best matches ({len(top_matches):,} of {len(matches):,})"
+        sections.append(details(heading, "\n\n".join(lines) or "No matches recorded."))
+    output_path.write_text(f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Similarity score report</title>
+  <style>
+    :root {{ color-scheme: light dark; font-family: system-ui, sans-serif; }}
+    body {{ max-width: 58rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }}
+    details {{ margin: 1rem 0; }}
+    summary {{ cursor: pointer; }}
+    pre {{ max-height: 32rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }}
+  </style>
+</head>
+<body>
+<main>
+  <h1>Similarity score report</h1>
+  {render_dataset_metadata(dataset_metadata or {})}
+  {''.join(sections)}
+</main>
+</body>
+</html>
+""", encoding="utf-8")
+    return output_path
+
+
 def write_contamination_report(
     run_dir: Path,
     training_texts: list[str] | None = None,
@@ -140,12 +206,42 @@ def write_contamination_report(
     scores: dict | None = None,
 ) -> Path:
     log = read_json(run_dir / "contamination.json")
+    datasets = {
+        role: log.get(f"{role}_dataset_metadata") or {"revision": log.get(f"{role}_dataset_revision")}
+        for role in ("training", "reference")
+    }
+    score_datasets = datasets
     scoring_hash = log.get("scoring_hash")
-    if scores is None and scoring_hash:
-        from score_cache import read_scores
+    score_path = run_dir / "scores.html"
+    if scoring_hash:
+        from score_cache import SCORE_CACHE_DIR, read_scores
 
-        scores = read_scores(scoring_hash)
-    score_matches = scores["matches"] if scores is not None else {}
+        score_path = SCORE_CACHE_DIR / scoring_hash / "report.html"
+        if scores is None and not score_path.is_file() and training_texts is not None and reference is not None:
+            scores = read_scores(scoring_hash)
+    if not score_path.is_file():
+        if scores is not None and training_texts is not None and reference is not None:
+            if scoring_hash:
+                cache_config = read_json(score_path.with_name("config.json"))
+                score_datasets = cache_config.get("dataset_metadata")
+                if score_datasets is None:
+                    score_datasets = {
+                        role: {"revision": value}
+                        for role, value in cache_config.get("dataset_revisions", {}).items()
+                    }
+            write_score_report(
+                score_path, scores["matches"], training_texts, reference, dataset_metadata=score_datasets,
+            )
+        elif not scoring_hash:
+            legacy_matches = {
+                name: step["best_matches"] for name, step in log["steps"].items() if "best_matches" in step
+            }
+            if legacy_matches:
+                write_score_report(score_path, legacy_matches, dataset_metadata=score_datasets)
+    score_link = ""
+    if score_path.is_file():
+        href = quote(relpath(score_path, run_dir))
+        score_link = f'<p><a href="{href}">View top similarity matches</a></p>'
     cache_info = ""
     if "cache_hit" in log:
         cache_status = {
@@ -157,17 +253,9 @@ def write_contamination_report(
         generation_time = log.get("score_generation_elapsed_seconds") if not log["cache_hit"] else None
         duration = f" · {generation_time:.4f} s score generation" if generation_time is not None else ""
         cache_info = f"<p>{cache_status}{cache_key}{duration}</p>"
-    revisions = []
-    for field, label in (
-        ("training_dataset_revision", "Training dataset revision"),
-        ("reference_dataset_revision", "Reference dataset revision"),
-    ):
-        if revision := log.get(field):
-            revisions.append(f"<p>{label} <code>{escape(revision)}</code></p>")
     steps = log["steps"]
     elapsed = log["elapsed_seconds"]
     rows = []
-    score_sections = []
     for name, step in steps.items():
         label = {
             "exact_match": "Exact match",
@@ -184,6 +272,13 @@ def write_contamination_report(
                 stage_label += f"<br><small>Model: <code>{escape(model_id)}</code></small>"
             if revision:
                 stage_label += f"<br><small>Revision: <code>{escape(revision)}</code></small>"
+        if name == "sampling":
+            max_samples = log.get("max_samples")
+            random_seed = log.get("random_seed")
+            if max_samples is not None:
+                stage_label += f"<br><small>Maximum samples: <code>{escape(str(max_samples))}</code></small>"
+            seed_label = "Not set" if random_seed is None else escape(str(random_seed))
+            stage_label += f"<br><small>Random seed: <code>{seed_label}</code></small>"
         threshold = "—"
         if "threshold" in step:
             value = step["threshold"]
@@ -193,27 +288,6 @@ def write_contamination_report(
             f'<td>{step["passed_count"]:,}</td><td>{step["rejected_count"]:,}</td>'
             f'<td>{threshold}</td></tr>'
         )
-        if name in score_matches or "best_matches" in step:
-            matches = score_matches[name] if name in score_matches else step["best_matches"]
-            top_matches = sorted(matches, key=lambda match: match["similarity"], reverse=True)[:100]
-            match_lines = []
-            for match in top_matches:
-                training_index = match["training_index"]
-                reference_index = match["reference_index"]
-                text = f'Magicoder [{training_index}] · MBPP [{reference_index}] · similarity {match["similarity"]:.8g}'
-                if training_texts is not None and reference is not None:
-                    text += f"\nMagicoder prompt:\n{training_texts[training_index]}\n\nMBPP prompt:\n{reference[reference_index]}"
-                elif "training_prompt" in match:
-                    text += f'\nMagicoder prompt:\n{match["training_prompt"]}\n\nMBPP prompt:\n{match["reference_prompt"]}'
-                match_lines.append(text)
-            match_text = "\n\n".join(match_lines)
-            heading = f"{label} best matches ({len(top_matches):,} of {len(matches):,})"
-            score_sections.append(details(heading, match_text or "No matches recorded."))
-        elif "similarities" in step:
-            scores = step["similarities"]
-            score_lines = "\n".join(f"{index}\t{score:.8g}" for index, score in enumerate(scores, start=1))
-            score_text = f"Stage input row\tMaximum similarity\n{score_lines}" if scores else "No scores recorded."
-            score_sections.append(details(f"{label} similarities ({len(scores):,})", score_text))
 
     output_path = run_dir / "report.html"
     output_path.write_text(f"""<!doctype html>
@@ -229,14 +303,12 @@ def write_contamination_report(
     th, td {{ padding: .5rem; border-bottom: 1px solid GrayText; text-align: right; }}
     th:first-child {{ text-align: left; }}
     .table-wrap {{ overflow-x: auto; }}
-    summary {{ cursor: pointer; }}
-    pre {{ max-height: 24rem; overflow: auto; tab-size: 24; }}
   </style>
 </head>
 <body>
 <main>
   <h1>Contamination report</h1>
-  {''.join(revisions)}
+  {render_dataset_metadata(datasets)}
   {cache_info}
   <p>{log["reference_count"]:,} reference texts · {elapsed:.4f} s total</p>
   <div class="table-wrap">
@@ -246,7 +318,7 @@ def write_contamination_report(
       <tbody>{''.join(rows)}</tbody>
     </table>
   </div>
-  {''.join(score_sections)}
+  {score_link}
 </main>
 </body>
 </html>

@@ -522,21 +522,18 @@
     "exact_match": {
       "input_count": 38284,
       "passed_count": 38284,
-      "rejected_count": 0,
-      "elapsed_seconds": 0.002158983999834163
+      "rejected_count": 0
     },
     "tfidf": {
       "input_count": 38284,
       "passed_count": 38239,
       "rejected_count": 45,
-      "elapsed_seconds": 0.006284586001129355,
       "threshold": 0.45
     },
     "embedding": {
       "input_count": 38284,
       "passed_count": 38124,
       "rejected_count": 160,
-      "elapsed_seconds": 0.005480390000229818,
       "threshold": 0.75,
       "model_id": "Alibaba-NLP/gte-modernbert-base",
       "model_revision": "e7f32e3c00f91d699e8c43b53106206bcc72bb22"
@@ -544,18 +541,32 @@
     "combined": {
       "input_count": 38284,
       "passed_count": 38105,
-      "rejected_count": 179,
-      "elapsed_seconds": 0.0019274500009487383
+      "rejected_count": 179
     },
     "sampling": {
       "input_count": 38105,
       "passed_count": 512,
-      "rejected_count": 37593,
-      "elapsed_seconds": 0.00037136399987502955
+      "rejected_count": 37593
     }
   },
   "max_samples": 512,
   "random_seed": 42,
-  "training_dataset_revision": "5f839b1f368a76b161028bb9edff055db34022b2",
-  "reference_dataset_revision": "4bb6404fdc6cacfda99d4ac4205087b89d32030c"
+  "training_dataset_metadata": {
+    "name": "ise-uiuc/Magicoder-OSS-Instruct-75K",
+    "revision": "5f839b1f368a76b161028bb9edff055db34022b2",
+    "selection": {
+      "split": "train",
+      "text_column": "problem",
+      "filter": "lang == \"python\""
+    }
+  },
+  "reference_dataset_metadata": {
+    "name": "google-research-datasets/mbpp",
+    "revision": "4bb6404fdc6cacfda99d4ac4205087b89d32030c",
+    "selection": {
+      "config": "full",
+      "split": "test",
+      "text_column": "text"
+    }
+  }
 }
