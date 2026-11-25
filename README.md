@@ -1,80 +1,57 @@
-# Magicoder and MBPP overlap filtering
+# Qwen2.5 Python SFT data preparation
 
-[dataset_loader.py](dataset_loader.py) loads the Python rows from Magicoder-OSS-Instruct-75K and the full MBPP dataset. The example below compares Magicoder problem descriptions with MBPP test prompts.
+Prepare Python instruction pairs from Magicoder-OSS-Instruct-75K for a Qwen2.5-1.5B-Instruct LoRA or QLoRA experiment. The pipeline reuses scored comparisons against MBPP test prompts, converts eligible completions to plain Python, and writes a reproducible sample.
 
-## How it works
+## Run the pipeline
 
-[`get_or_create_scores()`](contamination_scorer.py) produces scores. [`filter_scores()`](contamination_filter.py) applies thresholds and returns the remaining row indices and a run log.
+From the repository root, use the project's Python environment with `datasets` and `transformers`. The pinned Qwen tokenizer must be available in the local Hugging Face cache. Keep the repository's `score_cache/` directory available.
 
-1. **Exact match.** Apply Unicode NFKC, case folding, and whitespace normalization. Use a set of normalized reference prompts to detect duplicates.
-2. **TF-IDF and embeddings.** Score the same remaining prompts independently with each method. TF-IDF captures lexical overlap with sparse vectors. Optional embeddings capture semantic overlap with dense vectors. Both use batched cosine similarity and record the highest-scoring reference for each prompt.
-3. **Thresholds.** Reject a row when either score reaches its threshold. The filter returns all remaining original indices.
-
-## Example
-
-Requires `datasets`, `scikit-learn`, and `sentence-transformers` for the embedding step.
-
-```python
-from functools import partial
-
-from numpy import float32
-from sentence_transformers import SentenceTransformer
-from sklearn.feature_extraction.text import TfidfVectorizer
-
-from contamination_filter import filter_scores
-from contamination_scorer import get_or_create_scores
-from dataset_loader import load_magicoder_python_dataset, load_mbpp_dataset
-
-magicoder = load_magicoder_python_dataset()
-mbpp = load_mbpp_dataset()
-model_id = "Alibaba-NLP/gte-modernbert-base"
-revision = "e7f32e3c00f91d699e8c43b53106206bcc72bb22"
-model = SentenceTransformer(
-    model_id, revision=revision, device="cuda", model_kwargs={"dtype": "float32"},
-)
-
-training_texts = list(magicoder["problem"])
-reference = list(mbpp["test"]["text"])
-record = get_or_create_scores(
-    training_texts,
-    reference,
-    TfidfVectorizer(ngram_range=(1, 2), dtype=float32),
-    embedding_encoder=partial(model.encode, batch_size=16, show_progress_bar=False),
-    embedding_model_id=model_id,
-    embedding_model_revision=revision,
-    embedding_encode_settings={
-        "batch_size": 16, "device": "cuda", "dtype": "float32",
-        "max_seq_length": model.max_seq_length,
-    },
-    training_dataset_metadata={
-        "name": "ise-uiuc/Magicoder-OSS-Instruct-75K",
-        "selection": {"split": "train", "text_column": "problem", "filter": 'lang == "python"'},
-    },
-    reference_dataset_metadata={
-        "name": "google-research-datasets/mbpp",
-        "selection": {"config": "full", "split": "test", "text_column": "text"},
-    },
-)
-result = filter_scores(
-    record,
-    training_texts,
-    reference=reference,
-    similarity_threshold=0.45,
-    embedding_threshold=0.75,
-)
-selected = magicoder.select(result.kept_indices)
+```bash
+.venv/bin/python prepare_sft_data.py --token-budget 1024 --max-samples 5000 --seed 42 --html
 ```
 
-Set `embedding_threshold=None` to inspect scores before choosing an embedding threshold.
+The token budget applies to **one full prompt and completion after Qwen's chat template**. The defaults are 1,024 tokens, up to 5,000 examples, and seed 42. JSON logs and the final JSONL are always written. `--html` adds reports. Use `--no-notify-on-steps` to hide stage progress messages.
 
-## Reports
+## Dataset filtering pipeline
 
-Each filter result includes its own log at `result.log`. The optional dataset metadata dictionaries can include a top-level `revision` alongside `name` and `selection`. Cache entries record the metadata supplied when scores were first written. Metadata is excluded from the scoring hash.
+```mermaid
+flowchart TD
+    M["Magicoder · Python rows from pinned train revision"] --> C["Contamination filter"]
+    S["Cached MBPP comparisons<br/>Normalized exact match · TF-IDF · GTE embeddings"] --> C
+    C -->|"Reject exact matches or scores meeting either threshold"| A["Raw analysis<br/>Token lengths · completion formats · prompt requirements"]
+    A --> U["Prepare completions<br/>Unwrap eligible standalone Python fences"]
+    U --> R["Prepared analysis<br/>Remeasure changed pairs with the Qwen chat template"]
+    R --> F["Filter candidates<br/>Plain Python · within budget · no detected Markdown or explanation request"]
+    F --> P["Seeded uniform sample without replacement"]
+    P --> O["sft.jsonl<br/>One user prompt and one assistant completion per line"]
 
-Filtering keeps the log in memory. To create a report, save the log as `contamination.json` in a run directory, then call [`write_contamination_report(run_dir, training_texts, reference, scores=record.scores)`](report.py). The HTML shows thresholds, counts, runtime, and a link to the top-scoring prompt pairs. The JSON records the scoring hash, cache status, and retained indices.
+    classDef input fill:#e7effa,stroke:#577597,color:#172b46;
+    classDef output fill:#e1f2e8,stroke:#4c8262,color:#173726;
+    class M,S input;
+    class O output;
+```
+
+- **Contamination.** The scorer normalizes text with Unicode NFKC, case folding, and whitespace normalization for exact matches. It compares the remaining prompts with MBPP using TF-IDF and GTE embeddings, retaining the highest cosine similarity per method. The preparation pipeline verifies Magicoder's ordered prompts against the cache and rejects rows at TF-IDF **0.45** or embedding **0.75** and above.
+- **Completion preparation.** Unwrapping is limited to a single valid Python fence with no surrounding explanation and no detected prompt request for Markdown or explanation. Changed pairs are tokenized again. Completion checks verify Python syntax without running the code. Prompt requests are identified with English-language patterns, which can miss some wording.
+- **Final selection.** The pipeline samples from the filtered pool after formatting and budget checks. In the recorded run, **38,284 Python rows → 38,105 after contamination filtering → 7,898 eligible → 5,000 selected**.
+
+## Outputs
+
+Each execution writes to `pipeline_runs/<UTC-timestamp>/`. [Browse the recorded run](pipeline_runs/20261125T111027.671691Z/pipeline.json).
+
+| File | Contents |
+| --- | --- |
+| `pipeline.json` | Dataset and tokenizer revisions, stage timings, and relative output paths |
+| `contamination.json` | Scoring hash, thresholds, counts, and retained source indices |
+| `raw_analysis.json`, `prepared_analysis.json` | Row measurements and summary statistics before and after unwrapping |
+| `filtered.json` | Filter criteria and every eligible row's measurements |
+| `selection.json` | Seed, sample limit, counts, and selected source indices |
+| `sft.jsonl` | Final conversational `prompt` and `completion` pairs |
+
+With `--html`, the run also contains contamination, raw analysis, prepared analysis, filtering, and selection reports. The filtering report previews up to 100 rows. The recorded run includes a [selection report](pipeline_runs/20261125T111027.671691Z/selection.html) and the [final dataset](pipeline_runs/20261125T111027.671691Z/sft.jsonl).
 
 ## Score cache
 
-The scorer looks up `score_cache/<scoring_hash>/` directly. Each entry contains `config.json` and `scores.json`. Use `score_cache.load_score_record(hash)` to load a known entry without a model or vectorizer. Report generation adds a shared `report.html` to the entry. For an uncached run, the score report is saved as `scores.html` next to the run report. The key includes the ordered prompts, scoring version, TF-IDF settings, and embedding configuration. Thresholds and sampling settings can change without recomputing scores.
+[`get_or_create_scores()`](contamination_scorer.py) computes scores when the cache has no matching entry. Each `score_cache/<scoring_hash>/` entry stores `config.json` and `scores.json`. The key includes the ordered input prompts, TF-IDF settings, scoring version, and embedding configuration. Thresholds, sample size, and seed can change while reusing the same scores.
 
-To cache embedding scores, supply the model ID, its full commit hash, and the settings that affect encoder output. The settings describe the encoder supplied by the caller. An embedding encoder without that metadata runs without caching. Score caching is independent of report generation. To list stored configurations, inspect `score_cache/*/config.json`.
+When creating an embedding cache entry, supply the model ID, full revision, and effective encoder settings. Dataset metadata is recorded for provenance. The preparation pipeline uses its configured scoring hash and the Magicoder revision recorded there. The cache's optional HTML report shows the top 100 prompt pairs per similarity method.
