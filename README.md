@@ -55,3 +55,14 @@ With `--html`, the run also contains contamination, raw analysis, prepared analy
 [`get_or_create_scores()`](contamination_scorer.py) computes scores when the cache has no matching entry. Each `score_cache/<scoring_hash>/` entry stores `config.json` and `scores.json`. The key includes the ordered input prompts, TF-IDF settings, scoring version, and embedding configuration. Thresholds, sample size, and seed can change while reusing the same scores.
 
 When creating an embedding cache entry, supply the model ID, full revision, and effective encoder settings. Dataset metadata is recorded for provenance. The preparation pipeline uses its configured scoring hash and the Magicoder revision recorded there. The cache's optional HTML report shows the top 100 prompt pairs per similarity method.
+
+## License
+
+This repository's original code and documentation are licensed under the [MIT License](LICENSE). Third-party data and models retain their upstream licenses.
+
+## Acknowledgments
+
+- **Magicoder-OSS-Instruct-75K** by the iSE research group supplies the training examples. The included SFT data is a filtered and sampled Python subset with eligible completion code fences removed. [Dataset card and MIT license information](https://huggingface.co/datasets/ise-uiuc/Magicoder-OSS-Instruct-75K)
+- **Mostly Basic Python Problems (MBPP)** by Google Research supplies reference prompts for contamination filtering and tasks for evaluation. The score reports reproduce selected reference prompts. [Dataset card](https://huggingface.co/datasets/google-research-datasets/mbpp) · [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+- **Qwen2.5-1.5B-Instruct** by the Qwen team supplies the base model and tokenizer. [Model card and Apache-2.0 license information](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct)
+- **GTE ModernBERT Base** by Alibaba's Tongyi Lab supplies embeddings for semantic overlap detection. [Model card and Apache-2.0 license information](https://huggingface.co/Alibaba-NLP/gte-modernbert-base)
