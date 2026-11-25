@@ -1,0 +1,49 @@
+{
+  "pipeline_id": "20261125T111027.671691Z",
+  "timings": {
+    "total_elapsed_seconds": 54.486163204997865,
+    "stage_elapsed_seconds": {
+      "load_inputs": 3.348864080002386,
+      "contamination_filter": 0.2918147099990165,
+      "build_candidates": 3.9063378800019564,
+      "raw_analysis": 37.33056502099862,
+      "prepare_analysis": 8.229108106002968,
+      "filter_analysis": 0.023432392001268454,
+      "sample_dataset": 0.007121744001779007,
+      "write_artifacts": 1.348089962000813
+    }
+  },
+  "datasets": {
+    "training": {
+      "name": "ise-uiuc/Magicoder-OSS-Instruct-75K",
+      "revision": "5f839b1f368a76b161028bb9edff055db34022b2",
+      "selection": {
+        "split": "train",
+        "filter": "lang == \"python\"",
+        "text_column": "problem",
+        "completion_column": "solution"
+      }
+    },
+    "reference": {
+      "name": "google-research-datasets/mbpp",
+      "revision": "4bb6404fdc6cacfda99d4ac4205087b89d32030c",
+      "selection": {
+        "config": "full",
+        "split": "test",
+        "text_column": "text"
+      }
+    }
+  },
+  "tokenizer": {
+    "name": "Qwen/Qwen2.5-1.5B-Instruct",
+    "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306"
+  },
+  "artifacts": {
+    "contamination": "contamination.json",
+    "raw_analysis": "raw_analysis.json",
+    "prepared_analysis": "prepared_analysis.json",
+    "filtered_analysis": "filtered.json",
+    "selection": "selection.json",
+    "sft_dataset": "sft.jsonl"
+  }
+}

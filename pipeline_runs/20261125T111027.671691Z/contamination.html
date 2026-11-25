@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Contamination report · 20261125T111027.671691Z</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+    body { max-width: 58rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: .5rem; border-bottom: 1px solid GrayText; text-align: right; }
+    th:first-child { text-align: left; }
+    .table-wrap { overflow-x: auto; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Contamination report</h1>
+  <p><strong>Training dataset</strong> · Name <code>ise-uiuc/Magicoder-OSS-Instruct-75K</code> · Revision <code>5f839b1f368a76b161028bb9edff055db34022b2</code> · Split <code>train</code> · Filter <code>lang == &quot;python&quot;</code> · Text column <code>problem</code> · Completion column <code>solution</code></p><p><strong>Reference dataset</strong> · Name <code>google-research-datasets/mbpp</code> · Revision <code>4bb6404fdc6cacfda99d4ac4205087b89d32030c</code> · Config <code>full</code> · Split <code>test</code> · Text column <code>text</code></p>
+  <p>Reused cached scores · <code>c80ec7e5c359ef80647f4fec3ce43c1cfad9aaa7a379f20d1253d5237bd05a54</code></p>
+  
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th scope="col">Stage</th><th scope="col">Input</th><th scope="col">Kept</th>
+        <th scope="col">Rejected</th><th scope="col">Threshold</th></tr></thead>
+      <tbody><tr><th scope="row">Exact match</th><td>38,284</td><td>38,284</td><td>0</td><td>—</td></tr><tr><th scope="row">TF-IDF</th><td>38,284</td><td>38,239</td><td>45</td><td>0.45</td></tr><tr><th scope="row">Embedding<br><small>Model: <code>Alibaba-NLP/gte-modernbert-base</code></small><br><small>Revision: <code>e7f32e3c00f91d699e8c43b53106206bcc72bb22</code></small></th><td>38,284</td><td>38,124</td><td>160</td><td>0.75</td></tr><tr><th scope="row">Combined (OR rejection)</th><td>38,284</td><td>38,105</td><td>179</td><td>—</td></tr></tbody>
+    </table>
+  </div>
+  <p><a href="../../score_cache/c80ec7e5c359ef80647f4fec3ce43c1cfad9aaa7a379f20d1253d5237bd05a54/report.html">View top similarity matches</a></p>
+</main>
+</body>
+</html>

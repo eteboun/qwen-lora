@@ -204,12 +204,16 @@ def write_contamination_report(
     reference: list[str] | None = None,
     *,
     scores: dict | None = None,
+    html_name: str = "report.html",
 ) -> Path:
     log = read_json(run_dir / "contamination.json")
     datasets = {
         role: log.get(f"{role}_dataset_metadata") or {"revision": log.get(f"{role}_dataset_revision")}
         for role in ("training", "reference")
     }
+    pipeline_path = run_dir / "pipeline.json"
+    if pipeline_path.is_file():
+        datasets = read_json(pipeline_path)["datasets"]
     score_datasets = datasets
     scoring_hash = log.get("scoring_hash")
     score_path = run_dir / "scores.html"
@@ -254,9 +258,14 @@ def write_contamination_report(
         duration = f" · {generation_time:.4f} s score generation" if generation_time is not None else ""
         cache_info = f"<p>{cache_status}{cache_key}{duration}</p>"
     steps = log["steps"]
-    elapsed = log["elapsed_seconds"]
+    elapsed = log.get("elapsed_seconds")
     reference_count = log.get("reference_count")
-    reference_summary = f"{reference_count:,} reference texts · " if reference_count is not None else ""
+    summary_parts = []
+    if reference_count is not None:
+        summary_parts.append(f"{reference_count:,} reference texts")
+    if elapsed is not None:
+        summary_parts.append(f"{elapsed:.4f} s total")
+    timing_summary = f"<p>{' · '.join(summary_parts)}</p>" if summary_parts else ""
     rows = []
     for name, step in steps.items():
         label = {
@@ -291,7 +300,7 @@ def write_contamination_report(
             f'<td>{threshold}</td></tr>'
         )
 
-    output_path = run_dir / "report.html"
+    output_path = run_dir / html_name
     output_path.write_text(f"""<!doctype html>
 <html lang="en">
 <head>
@@ -312,7 +321,7 @@ def write_contamination_report(
   <h1>Contamination report</h1>
   {render_dataset_metadata(datasets)}
   {cache_info}
-  <p>{reference_summary}{elapsed:.4f} s total</p>
+  {timing_summary}
   <div class="table-wrap">
     <table>
       <thead><tr><th scope="col">Stage</th><th scope="col">Input</th><th scope="col">Kept</th>
@@ -326,6 +335,210 @@ def write_contamination_report(
 </html>
 """, encoding="utf-8")
     return output_path
+
+
+def write_analysis_report(analysis_path: Path) -> Path:
+    """Render an aggregate HTML report from a saved analysis JSON."""
+    analysis = read_json(analysis_path)
+    run_dir = analysis_path.parent
+    pipeline_id = analysis.get("pipeline_id")
+    source = analysis.get("source")
+    tokenizer_id = analysis.get("tokenizer_id")
+    contamination_line = ""
+    if pipeline_id is not None and (run_dir / "contamination.html").is_file():
+        contamination_line = '<p><a href="contamination.html">Contamination report</a></p>'
+    elif run_id := analysis.get("source_contamination_run_id"):
+        log_path = analysis.get("source_contamination_log")
+        contamination_html = Path(log_path).with_name("report.html") if log_path else None
+        if contamination_html is not None and (run_dir / contamination_html).is_file():
+            href = quote(contamination_html.as_posix())
+            contamination_line = f'<p><a href="{href}">Contamination report {escape(run_id)}</a></p>'
+        else:
+            contamination_line = f"<p>Contamination run <code>{escape(run_id)}</code></p>"
+
+    token_rows = []
+    for name, summary in analysis["token_lengths"].items():
+        cells = (
+            [f"{summary['median']:,.2f}", f"{summary['p95']:,.2f}", f"{summary['p99']:,.2f}", f"{summary['maximum']:,}"]
+            if summary is not None else ["—"] * 4
+        )
+        token_rows.append(
+            f'<tr><th scope="row">{escape(name.title())}</th>'
+            + "".join(f"<td>{value}</td>" for value in cells) + "</tr>"
+        )
+
+    format_labels = {
+        "raw_python": "Raw Python",
+        "single_markdown_python": "Single Python code block",
+        "code_with_explanation": "Code with explanation",
+        "other": "Other",
+    }
+    counts = [(format_labels[name], count) for name, count in analysis["completion_formats"].items()]
+    counts.extend([
+        ("Completion starts with a Markdown fence", analysis["starts_with_markdown_count"]),
+        ("Prompt requests an explanation", analysis["prompt_explanation_request_count"]),
+        ("Prompt requests Markdown", analysis["prompt_markdown_request_count"]),
+    ])
+    count_rows = "".join(
+        f'<tr><th scope="row">{escape(label)}</th><td>{count:,}</td></tr>' for label, count in counts
+    )
+    source_line = f"<p>Source <code>{escape(str(source))}</code></p>" if source is not None else ""
+    tokenizer_line = f"<p>Tokenizer <code>{escape(tokenizer_id)}</code></p>" if tokenizer_id else ""
+
+    output_path = analysis_path.with_suffix(".html") if pipeline_id is not None else run_dir / "report.html"
+    output_path.write_text(f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Python dataset analysis</title>
+  <style>
+    :root {{ color-scheme: light dark; font-family: system-ui, sans-serif; }}
+    body {{ max-width: 52rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }}
+    code {{ overflow-wrap: anywhere; }}
+    table {{ width: 100%; border-collapse: collapse; }}
+    th, td {{ border-bottom: 1px solid GrayText; padding: .45rem; text-align: right; }}
+    th:first-child {{ text-align: left; }}
+    .table-wrap {{ overflow-x: auto; }}
+  </style>
+</head>
+<body>
+<main>
+  <h1>Python dataset analysis</h1>
+  <p><strong>{len(analysis["rows"]):,} examples</strong></p>
+  {source_line}
+  {tokenizer_line}
+  {contamination_line}
+  <h2>Token lengths</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th scope="col">Text</th><th scope="col">Median</th><th scope="col">P95</th>
+      <th scope="col">P99</th><th scope="col">Maximum</th></tr></thead>
+    <tbody>{''.join(token_rows)}</tbody>
+  </table></div>
+  <h2>Completion formats and prompt requests</h2>
+  <table>
+    <thead><tr><th scope="col">Measure</th><th scope="col">Count</th></tr></thead>
+    <tbody>{count_rows}</tbody>
+  </table>
+</main>
+</body>
+</html>
+""", encoding="utf-8")
+    return output_path
+
+
+def write_filtered_analysis_report(run_dir: Path, *, html_name: str = "report.html") -> Path:
+    """Render a limited preview from a saved filtered analysis."""
+    result = read_json(run_dir / "filtered.json")
+    rows = result["rows"][:result["html_upper_bound"]]
+    source = Path(result["source_analysis"])
+    summary_path = source.with_suffix(".html") if result.get("pipeline_id") else source.with_name("report.html")
+    analysis_link = ""
+    if (run_dir / summary_path).is_file():
+        analysis_link = (
+            f'<p><a href="{quote(summary_path.as_posix())}">Analysis report {escape(source.parent.name)}</a></p>'
+        )
+    criteria = " · ".join(
+        f"{escape(name.replace('_', ' ').capitalize())} <strong>{escape(str(value))}</strong>"
+        for name, value in result["criteria"].items() if value is not None
+    ) or "All rows"
+
+    fields = (
+        ("source_index", "Source index"), ("prompt_tokens", "Prompt tokens"),
+        ("completion_tokens", "Completion tokens"), ("total_tokens", "Total tokens"),
+        ("completion_format", "Completion format"), ("starts_with_markdown", "Starts with Markdown"),
+        ("prompt_requests_explanation", "Requests explanation"),
+        ("prompt_requests_markdown", "Requests Markdown"),
+    )
+    headings = "".join(f'<th scope="col">{label}</th>' for _, label in fields)
+    table_rows = []
+    for row in rows:
+        cells = []
+        for key, _ in fields:
+            value = row.get("source_index", row.get("index")) if key == "source_index" else row[key]
+            text = ("Yes" if value else "No") if isinstance(value, bool) else str(value)
+            evidence_key = {
+                "prompt_requests_explanation": "explanation_request_match",
+                "prompt_requests_markdown": "markdown_request_match",
+            }.get(key)
+            evidence = row.get(evidence_key) if evidence_key else None
+            if evidence:
+                text += f" · {evidence}"
+            cells.append(f"<td>{escape(text)}</td>")
+        table_rows.append(f"<tr>{''.join(cells)}</tr>")
+    output = run_dir / html_name
+    output.write_text(f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Filtered Python dataset analysis</title>
+  <style>
+    :root {{ color-scheme: light dark; font-family: system-ui, sans-serif; }}
+    body {{ max-width: 74rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }}
+    .table-wrap {{ overflow-x: auto; }}
+    table {{ width: 100%; border-collapse: collapse; }}
+    th, td {{ padding: .45rem; border-bottom: 1px solid GrayText; text-align: left; vertical-align: top; }}
+  </style>
+</head>
+<body>
+<main>
+  <h1>Filtered Python dataset analysis</h1>
+  {analysis_link}
+  <p>{criteria}</p>
+  <p><strong>{result["matched_count"]:,} of {result["input_count"]:,} rows matched.</strong>
+    Showing {len(rows):,} in source order.</p>
+  <div class="table-wrap"><table>
+    <thead><tr>{headings}</tr></thead>
+    <tbody>{''.join(table_rows)}</tbody>
+  </table></div>
+</main>
+</body>
+</html>
+""", encoding="utf-8")
+    return output
+
+
+def write_selection_report(run_dir: Path) -> Path:
+    """Render the sampling settings, counts, and source filter link."""
+    log = read_json(run_dir / "selection.json")
+    filter_path = Path(log["source_filter"])
+    source = filter_path.with_suffix(".html")
+    if not (run_dir / source).is_file():
+        source = filter_path.with_name("report.html")
+    source_link = (
+        f'<p><a href="{quote(source.as_posix())}">Source filter report</a></p>'
+        if (run_dir / source).is_file() else ""
+    )
+    output = run_dir / "selection.html"
+    output.write_text(f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SFT sample selection</title>
+  <style>
+    :root {{ color-scheme: light dark; font-family: system-ui, sans-serif; }}
+    body {{ max-width: 48rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }}
+    dt {{ font-weight: 600; }}
+    dd {{ margin: 0 0 .6rem; }}
+  </style>
+</head>
+<body>
+<main>
+  <h1>SFT sample selection</h1>
+  <p><strong>{log["selected_count"]:,} of {log["input_count"]:,} eligible rows selected.</strong></p>
+  <dl>
+    <dt>Maximum samples</dt><dd>{log["max_samples"]:,}</dd>
+    <dt>Random seed</dt><dd>{log["seed"]}</dd>
+    <dt>Dataset</dt><dd><code>{escape(log["dataset"])}</code></dd>
+  </dl>
+  {source_link}
+</main>
+</body>
+</html>
+""", encoding="utf-8")
+    return output
 
 
 def main():

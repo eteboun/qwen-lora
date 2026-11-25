@@ -4,11 +4,11 @@
 
 ## How it works
 
-[ContaminationScorer](contamination_scorer.py) produces scores. [ContaminationFilter](contamination_filter.py) applies thresholds and samples the remaining rows.
+[`get_or_create_scores()`](contamination_scorer.py) produces scores. [`filter_scores()`](contamination_filter.py) applies thresholds and returns the remaining row indices and a run log.
 
 1. **Exact match.** Apply Unicode NFKC, case folding, and whitespace normalization. Use a set of normalized reference prompts to detect duplicates.
 2. **TF-IDF and embeddings.** Score the same remaining prompts independently with each method. TF-IDF captures lexical overlap with sparse vectors. Optional embeddings capture semantic overlap with dense vectors. Both use batched cosine similarity and record the highest-scoring reference for each prompt.
-3. **Thresholds and sampling.** Reject a row when either score reaches its threshold. If `max_samples` is set, sample uniformly without replacement from the remaining rows. The filter returns their original indices.
+3. **Thresholds.** Reject a row when either score reaches its threshold. The filter returns all remaining original indices.
 
 ## Example
 
@@ -21,8 +21,8 @@ from numpy import float32
 from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-from contamination_filter import ContaminationFilter
-from contamination_scorer import ContaminationScorer
+from contamination_filter import filter_scores
+from contamination_scorer import get_or_create_scores
 from dataset_loader import load_magicoder_python_dataset, load_mbpp_dataset
 
 magicoder = load_magicoder_python_dataset()
@@ -35,7 +35,7 @@ model = SentenceTransformer(
 
 training_texts = list(magicoder["problem"])
 reference = list(mbpp["test"]["text"])
-record = ContaminationScorer().get_or_create_scores(
+record = get_or_create_scores(
     training_texts,
     reference,
     TfidfVectorizer(ngram_range=(1, 2), dtype=float32),
@@ -55,30 +55,26 @@ record = ContaminationScorer().get_or_create_scores(
         "selection": {"config": "full", "split": "test", "text_column": "text"},
     },
 )
-filterer = ContaminationFilter()
-indices = filterer.filter_scores(
+result = filter_scores(
     record,
     training_texts,
     reference=reference,
     similarity_threshold=0.45,
     embedding_threshold=0.75,
-    max_samples=512,
-    random_seed=42,
-    generate_report=True,
 )
-selected = magicoder.select(indices)
+selected = magicoder.select(result.kept_indices)
 ```
 
 Set `embedding_threshold=None` to inspect scores before choosing an embedding threshold.
 
 ## Reports
 
-The latest log is available as `filterer.contamination_log`. The optional dataset metadata dictionaries can include a top-level `revision` alongside `name` and `selection`. Cache entries record the metadata supplied when scores were first written. Metadata is excluded from the scoring hash.
+Each filter result includes its own log at `result.log`. The optional dataset metadata dictionaries can include a top-level `revision` alongside `name` and `selection`. Cache entries record the metadata supplied when scores were first written. Metadata is excluded from the scoring hash.
 
-With `generate_report=True`, [report.py](report.py) writes `contamination_runs/<UTC-timestamp>/report.html` and `contamination.json`. The HTML shows thresholds, counts, total runtime, and score generation time when scores are computed. It links to a separate score report with up to 100 highest-scoring prompt pairs per method. The run log records the scoring hash, cache status, and selected indices.
+Filtering keeps the log in memory. To create a report, save the log as `contamination.json` in a run directory, then call [`write_contamination_report(run_dir, training_texts, reference, scores=record.scores)`](report.py). The HTML shows thresholds, counts, runtime, and a link to the top-scoring prompt pairs. The JSON records the scoring hash, cache status, and retained indices.
 
 ## Score cache
 
 The scorer looks up `score_cache/<scoring_hash>/` directly. Each entry contains `config.json` and `scores.json`. Use `score_cache.load_score_record(hash)` to load a known entry without a model or vectorizer. Report generation adds a shared `report.html` to the entry. For an uncached run, the score report is saved as `scores.html` next to the run report. The key includes the ordered prompts, scoring version, TF-IDF settings, and embedding configuration. Thresholds and sampling settings can change without recomputing scores.
 
-To cache embedding scores, supply the model ID, its full commit hash, and the settings that affect encoder output. The settings describe the encoder supplied by the caller. An embedding encoder without that metadata runs without caching. Cache files can be written with `generate_report=False`. To list stored configurations, inspect `score_cache/*/config.json`.
+To cache embedding scores, supply the model ID, its full commit hash, and the settings that affect encoder output. The settings describe the encoder supplied by the caller. An embedding encoder without that metadata runs without caching. Score caching is independent of report generation. To list stored configurations, inspect `score_cache/*/config.json`.
