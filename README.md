@@ -16,14 +16,14 @@ The token budget applies to **one full prompt and completion after Qwen's chat t
 
 ```mermaid
 flowchart TD
-    M["Magicoder · Python rows from pinned train revision"] --> C["Contamination filter"]
-    S["Cached MBPP comparisons<br/>Normalized exact match · TF-IDF · GTE embeddings"] --> C
-    C -->|"Reject exact matches or scores meeting either threshold"| A["Raw analysis<br/>Token lengths · completion formats · prompt requirements"]
-    A --> U["Prepare completions<br/>Unwrap eligible standalone Python fences"]
-    U --> R["Prepared analysis<br/>Remeasure changed pairs with the Qwen chat template"]
-    R --> F["Filter candidates<br/>Plain Python · within budget · no detected Markdown or explanation request"]
-    F --> P["Seeded uniform sample without replacement"]
-    P --> O["sft.jsonl<br/>One user prompt and one assistant completion per line"]
+    M["Magicoder Python Data"] --> C["Contamination Filtering"]
+    S["MBPP Score Cache"] --> C
+    C --> A["Raw Data Analysis"]
+    A --> U["Completion Unwrapping"]
+    U --> R["Prepared Data Analysis"]
+    R --> F["Token Budget and Format Filtering"]
+    F --> P["Seeded Random Sampling"]
+    P --> O["SFT Dataset (sft.jsonl)"]
 
     classDef input fill:#e7effa,stroke:#577597,color:#172b46;
     classDef output fill:#e1f2e8,stroke:#4c8262,color:#173726;
