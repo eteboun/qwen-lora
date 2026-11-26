@@ -56,6 +56,18 @@ With `--html`, the run also contains contamination, raw analysis, prepared analy
 
 When creating an embedding cache entry, supply the model ID, full revision, and effective encoder settings. Dataset metadata is recorded for provenance. The preparation pipeline uses its configured scoring hash and the Magicoder revision recorded there. The cache's optional HTML report shows the top 100 prompt pairs per similarity method.
 
+## LoRA memory profiling
+
+Run from the repository root with CUDA-enabled PyTorch, `trl`, `peft`, and the pinned Qwen model and tokenizer in the local Hugging Face cache. On Ubuntu or WSL, install the development headers for your Python version if Triton reports a missing `Python.h`.
+
+```bash
+.venv/bin/python profile_training_memory.py --batch-size 4 --max-length 1024 --lora-rank 8
+```
+
+The profiler selects the longest examples by token count after applying Qwen's chat template and runs one BF16 LoRA optimizer step with adapters on `q_proj` and `v_proj`. The defaults are batch size 1, a 1,024-token training limit per example, and rank 8. Use `--dataset-path` to choose a different JSONL file.
+
+Each run writes `memory_profile.json` and `memory_profile.html` to `memory_profile_runs/<UTC-timestamp>/`. The report includes the first forward's token count, trainable parameter counts, and CUDA memory measurements through the first optimizer step. The recorded batch-size-4 run used 3.775 GiB of peak allocated memory. [Recorded profile](memory_profile_runs/20261126T175635.330835Z/memory_profile.html)
+
 ## License
 
 This repository's original code and documentation are licensed under the [MIT License](LICENSE). Third-party data and models retain their upstream licenses.
