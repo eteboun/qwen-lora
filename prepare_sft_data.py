@@ -11,14 +11,13 @@ from analyze_data import DataAnalysis, PYTHON_FENCE, analyze_data, analyze_rows,
 from contamination_filter import filter_scores
 from dataset_loader import load_magicoder_python_dataset
 from filter_analysis import filter_analysis, write_filtered_analysis
+from project_config import MODEL_ID, MODEL_REVISION
 from report import write_analysis_report, write_contamination_report, write_filtered_analysis_report, write_selection_report
 from score_cache import load_score_record
 from select_sft_data import SftSelection, select_sft_data, write_sft_selection
 
 
 SCORING_HASH = "c80ec7e5c359ef80647f4fec3ce43c1cfad9aaa7a379f20d1253d5237bd05a54"
-TOKENIZER_ID = "Qwen/Qwen2.5-1.5B-Instruct"
-TOKENIZER_REVISION = "989aa7980e4cf806f80c7fef2b1adb7bc71aa306"
 DEFAULT_TOKEN_BUDGET = 1_024
 DEFAULT_MAX_SAMPLES = 5_000
 DEFAULT_SEED = 42
@@ -111,7 +110,7 @@ def prepare_sft_data(
             for index, example in zip(kept, dataset.select(kept), strict=True)
         ]
         tokenizer = AutoTokenizer.from_pretrained(
-            TOKENIZER_ID, revision=TOKENIZER_REVISION, local_files_only=True,
+            MODEL_ID, revision=MODEL_REVISION, local_files_only=True,
         )
 
     with _pipeline_step("raw_analysis", stage_timings, notify_on_steps):
@@ -144,7 +143,7 @@ def prepare_sft_data(
             analysis_path = write_analysis_json(
                 analysis,
                 run_dir / f"{name}.json",
-                tokenizer_id=TOKENIZER_ID,
+                tokenizer_id=MODEL_ID,
                 pipeline_id=pipeline_id,
             )
             analysis_paths.append(analysis_path)
@@ -173,7 +172,7 @@ def prepare_sft_data(
             },
             "reference": record.dataset_metadata.get("reference"),
         },
-        "tokenizer": {"name": TOKENIZER_ID, "revision": TOKENIZER_REVISION},
+        "tokenizer": {"name": MODEL_ID, "revision": MODEL_REVISION},
         "artifacts": {
             "contamination": contamination_path.name,
             "raw_analysis": analysis_paths[0].name,

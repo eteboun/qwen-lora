@@ -541,6 +541,83 @@ def write_selection_report(run_dir: Path) -> Path:
     return output
 
 
+def write_memory_profile_report(profile_path: Path) -> Path:
+    """Render a training memory profile from its saved JSON."""
+    profile = read_json(profile_path)
+    measurements = profile["measurements"]
+    stages = (
+        ("Before model load", "initial_memory"),
+        ("Base model loaded", "base_model_initialized_memory"),
+        ("Trainer initialized", "trainer_initialized_memory"),
+        ("After first forward", "after_forward_memory"),
+        ("After first backward", "after_backward_memory"),
+        ("After first optimizer step", "after_optimizer_step_memory"),
+    )
+    rows = []
+    for label, key in stages:
+        memory = measurements[key]
+        cells = (
+            "".join(f"<td>{memory[metric]:.3f}</td>" for metric in ("allocated", "reserved", "peak"))
+            if memory is not None else '<td colspan="3">Unavailable</td>'
+        )
+        rows.append(f'<tr><th scope="row">{label}</th>{cells}</tr>')
+
+    summary = (
+        ("GPU", profile["gpu_name"]),
+        ("Model", profile["model_id"]),
+        ("Model revision", profile["revision"]),
+        ("Model dtype", profile["dtype"]),
+        ("Source dataset", profile["dataset_path"]),
+        ("Source row indices (zero-based)", ", ".join(map(str, profile["source_indices"]))),
+        ("First forward tokens", measurements["first_forward_token_count"]),
+        ("Base model trainable parameters", measurements["base_model_trainable_params"]),
+        ("LoRA trainable parameters", measurements["trainer_initialized_trainable_params"]),
+    )
+    entries = []
+    for label, value in summary:
+        display = "Unavailable" if value is None else format(value, "," if isinstance(value, int) else "")
+        entries.append(f"<dt>{label}</dt><dd>{escape(display)}</dd>")
+    output = profile_path.with_suffix(".html")
+    if output.resolve() == profile_path.resolve():
+        raise ValueError("The HTML report must have a separate output path.")
+    output.write_text(f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Training memory profile</title>
+  <style>
+    :root {{ color-scheme: light dark; font-family: system-ui, sans-serif; }}
+    body {{ max-width: 58rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }}
+    dt {{ font-weight: 600; }}
+    dd {{ margin: 0 0 .6rem; overflow-wrap: anywhere; }}
+    table {{ width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }}
+    caption {{ text-align: left; font-weight: 600; }}
+    th, td {{ padding: .5rem; border-bottom: 1px solid GrayText; text-align: right; }}
+    th:first-child {{ text-align: left; }}
+    details {{ margin-top: 1rem; }}
+    pre {{ overflow: auto; }}
+  </style>
+</head>
+<body>
+<main>
+  <h1>Training memory profile</h1>
+  <dl>{"".join(entries)}</dl>
+  <table>
+    <caption>CUDA memory (GiB)</caption>
+    <thead><tr><th scope="col">Stage</th><th scope="col">Allocated</th><th scope="col">Reserved</th><th scope="col">Peak allocated</th></tr></thead>
+    <tbody>{"".join(rows)}</tbody>
+  </table>
+  <p>Peak tracking restarts before the training step.</p>
+  {details("SFT config", json.dumps(profile["sft_config"], indent=2))}
+  {details("LoRA config", json.dumps(profile["lora_config"], indent=2))}
+</main>
+</body>
+</html>
+""", encoding="utf-8")
+    return output
+
+
 def main():
     parser = argparse.ArgumentParser(description="Generate HTML reports from baseline run JSON files.")
     parser.add_argument("run_dir", nargs="?", type=Path, help="Run directory. Defaults to all baseline runs.")

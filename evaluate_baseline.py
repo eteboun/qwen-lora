@@ -13,10 +13,10 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
 
 from dataset_loader import load_mbpp_dataset
+from project_config import MODEL_ID
 from report import write_report
 
 
-MODEL_ID = "Qwen/Qwen2.5-1.5B-Instruct"
 DOCKER_IMAGE = "python:3.14-slim"
 SANDBOX_TIMEOUT = 15
 TESTS_PASSED = 42
