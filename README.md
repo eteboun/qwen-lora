@@ -68,6 +68,20 @@ The profiler selects the longest examples by token count after applying Qwen's c
 
 Each run writes `memory_profile.json` and `memory_profile.html` to `memory_profile_runs/<UTC-timestamp>/`. The report includes the first forward's token count, trainable parameter counts, and CUDA memory measurements through the first optimizer step. The recorded batch-size-4 run used 3.775 GiB of peak allocated memory. [Recorded profile](memory_profile_runs/20261126T175635.330835Z/memory_profile.html)
 
+## First LoRA experiment
+
+The first BF16 LoRA run trained for one epoch with batch size 4 and rank 8 on `q_proj` and `v_proj`. The prepared dataset was split into 4,500 training and 500 validation examples with seed 42. [Training config](training_runs/20261127T172714.614460Z/config.json) · [Trainer state](training_runs/20261127T172714.614460Z/trainer_state.json)
+
+Both models were evaluated on the same 500 MBPP tasks with identical prompts and generation settings.
+
+| Metric | Base model | LoRA after one epoch |
+| --- | ---: | ---: |
+| Pass@1 | 204/500 (40.8%) | 202/500 (40.4%) |
+| Raw Python responses | 0/500 (0%) | 291/500 (58.2%) |
+| Responses with prose outside a code block | 7/500 | 0/500 |
+
+Pass@1 measures the code tested after Markdown extraction. The raw Python metric also counts syntactically valid code containing comments or example usage. A follow-up audit found comments in 2,935 of the 5,000 prepared completions and direct top-level `print(...)` statements in 1,452. The next data preparation pass will assess how many examples a stricter AST-based filter removes. [Base model report](mbpp_runs/20261127T154202.137530Z/report.html) · [LoRA report](mbpp_runs/20261127T175514.492937Z/report.html)
+
 ## License
 
 This repository's original code and documentation are licensed under the [MIT License](LICENSE). Third-party data and models retain their upstream licenses.
