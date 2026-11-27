@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Python dataset analysis</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+    body { max-width: 52rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+    code { overflow-wrap: anywhere; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid GrayText; padding: .45rem; text-align: right; }
+    th:first-child { text-align: left; }
+    .table-wrap { overflow-x: auto; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Python dataset analysis</h1>
+  <p><strong>500 examples</strong></p>
+  <p>Source <code>google-research-datasets/mbpp · full/test · revision 4bb6404fdc6cacfda99d4ac4205087b89d32030c</code></p>
+  <p>Tokenizer <code>Qwen/Qwen2.5-1.5B-Instruct</code></p>
+
+  <h2>Token lengths</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th scope="col">Text</th><th scope="col">Median</th><th scope="col">P95</th>
+      <th scope="col">P99</th><th scope="col">Maximum</th></tr></thead>
+    <tbody><tr><th scope="row">Prompt</th><td>15.00</td><td>24.00</td><td>34.03</td><td>47</td></tr><tr><th scope="row">Completion</th><td>46.00</td><td>143.05</td><td>209.06</td><td>432</td></tr><tr><th scope="row">Total</th><td>92.00</td><td>193.20</td><td>261.01</td><td>492</td></tr></tbody>
+  </table></div>
+  <h2>Completion formats and prompt requests</h2>
+  <table>
+    <thead><tr><th scope="col">Measure</th><th scope="col">Count</th></tr></thead>
+    <tbody><tr><th scope="row">Raw Python</th><td>500</td></tr><tr><th scope="row">Single Python code block</th><td>0</td></tr><tr><th scope="row">Code with explanation</th><td>0</td></tr><tr><th scope="row">Other</th><td>0</td></tr><tr><th scope="row">Completion starts with a Markdown fence</th><td>0</td></tr><tr><th scope="row">Prompt requests an explanation</th><td>0</td></tr><tr><th scope="row">Prompt requests Markdown</th><td>0</td></tr></tbody>
+  </table>
+</main>
+</body>
+</html>
