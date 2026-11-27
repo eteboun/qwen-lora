@@ -1,0 +1,12 @@
+{
+  "passed": 2,
+  "total": 5,
+  "pass_at_1": 0.4,
+  "completion_formats": {
+    "raw_python": 0,
+    "single_markdown_python": 4,
+    "code_with_explanation": 1,
+    "other": 0
+  },
+  "starts_with_markdown_count": 5
+}

@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MBPP baseline · 20261127T153544.813016Z</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+    body { max-width: 58rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+    header p, article p { margin: .4rem 0; }
+    .run-note { font-size: 1.15rem; font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere; }
+    h1, h2, h3 { line-height: 1.2; }
+    article { border: 1px solid GrayText; border-radius: .6rem; margin: 1rem 0; padding: .9rem; }
+    article h3 { margin: 0; }
+    details { margin-top: .55rem; }
+    summary { cursor: pointer; }
+    pre { padding: .75rem; background: color-mix(in srgb, CanvasText 7%, Canvas);
+           white-space: pre-wrap; overflow-wrap: anywhere; }
+    table { width: 100%; border-collapse: collapse; margin: .8rem 0; }
+    th, td { border-bottom: 1px solid GrayText; padding: .4rem; text-align: left;
+             vertical-align: top; overflow-wrap: anywhere; }
+    td { font-family: monospace; }
+    .passed, .failed { font-size: .8rem; margin-left: .4rem; padding: .2rem .45rem; border-radius: .3rem; }
+    .passed { background: #d3eedc; color: #174a2a; }
+    .failed { background: #f9dddd; color: #7c2020; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>MBPP baseline</h1>
+  <p class="run-note">End-to-end smoke test</p>
+  <p><strong>40.0% pass@1 · 2/5 passed</strong></p>
+  <p>Qwen/Qwen2.5-1.5B-Instruct · google-research-datasets/mbpp · full / test</p>
+  <p>Run: <time>20261127T153544.813016Z</time></p>
+</header>
+<main>
+  <h2>Response formats</h2><table><thead><tr><th scope="col">Measure</th><th scope="col">Count</th><th scope="col">Share</th></tr></thead><tbody><tr><th scope="row">Raw Python</th><td>0</td><td>0.0%</td></tr><tr><th scope="row">Single Python code block</th><td>4</td><td>80.0%</td></tr><tr><th scope="row">Code with explanation</th><td>1</td><td>20.0%</td></tr><tr><th scope="row">Other</th><td>0</td><td>0.0%</td></tr><tr><th scope="row">Starts with a Markdown fence</th><td>5</td><td>100.0%</td></tr></tbody></table>
+  <details><summary>Run configuration</summary><pre>{
+  &quot;note&quot;: &quot;End-to-end smoke test&quot;,
+  &quot;run_kind&quot;: &quot;baseline&quot;,
+  &quot;model_id&quot;: &quot;Qwen/Qwen2.5-1.5B-Instruct&quot;,
+  &quot;model_revision&quot;: &quot;989aa7980e4cf806f80c7fef2b1adb7bc71aa306&quot;,
+  &quot;adapter_path&quot;: null,
+  &quot;tokenizer_id&quot;: &quot;Qwen/Qwen2.5-1.5B-Instruct&quot;,
+  &quot;tokenizer_revision&quot;: &quot;989aa7980e4cf806f80c7fef2b1adb7bc71aa306&quot;,
+  &quot;model_dtype&quot;: &quot;torch.float16&quot;,
+  &quot;dataset&quot;: {
+    &quot;id&quot;: &quot;google-research-datasets/mbpp&quot;,
+    &quot;config&quot;: &quot;full&quot;,
+    &quot;split&quot;: &quot;test&quot;,
+    &quot;revision&quot;: &quot;4bb6404fdc6cacfda99d4ac4205087b89d32030c&quot;
+  },
+  &quot;limit&quot;: 5,
+  &quot;num_examples&quot;: 5,
+  &quot;docker_image&quot;: &quot;python:3.14-slim&quot;,
+  &quot;sandbox_timeout_seconds&quot;: 15,
+  &quot;generation_config&quot;: {
+    &quot;max_length&quot;: null,
+    &quot;max_new_tokens&quot;: 512,
+    &quot;min_length&quot;: null,
+    &quot;min_new_tokens&quot;: null,
+    &quot;early_stopping&quot;: null,
+    &quot;max_time&quot;: null,
+    &quot;stop_strings&quot;: null,
+    &quot;do_sample&quot;: false,
+    &quot;num_beams&quot;: null,
+    &quot;use_mtp&quot;: null,
+    &quot;use_cache&quot;: null,
+    &quot;cache_implementation&quot;: null,
+    &quot;cache_config&quot;: null,
+    &quot;max_cache_len&quot;: null,
+    &quot;temperature&quot;: 0.7,
+    &quot;top_k&quot;: 20,
+    &quot;top_p&quot;: 0.8,
+    &quot;min_p&quot;: null,
+    &quot;top_h&quot;: null,
+    &quot;typical_p&quot;: null,
+    &quot;epsilon_cutoff&quot;: null,
+    &quot;eta_cutoff&quot;: null,
+    &quot;repetition_penalty&quot;: 1.1,
+    &quot;encoder_repetition_penalty&quot;: null,
+    &quot;length_penalty&quot;: null,
+    &quot;no_repeat_ngram_size&quot;: null,
+    &quot;bad_words_ids&quot;: null,
+    &quot;renormalize_logits&quot;: null,
+    &quot;forced_bos_token_id&quot;: null,
+    &quot;forced_eos_token_id&quot;: null,
+    &quot;remove_invalid_values&quot;: null,
+    &quot;exponential_decay_length_penalty&quot;: null,
+    &quot;suppress_tokens&quot;: null,
+    &quot;begin_suppress_tokens&quot;: null,
+    &quot;sequence_bias&quot;: null,
+    &quot;token_healing&quot;: null,
+    &quot;guidance_scale&quot;: null,
+    &quot;watermarking_config&quot;: null,
+    &quot;num_return_sequences&quot;: null,
+    &quot;output_attentions&quot;: null,
+    &quot;output_hidden_states&quot;: null,
+    &quot;output_scores&quot;: null,
+    &quot;output_logits&quot;: null,
+    &quot;return_dict_in_generate&quot;: null,
+    &quot;pad_token_id&quot;: 151645,
+    &quot;bos_token_id&quot;: 151643,
+    &quot;eos_token_id&quot;: [
+      151645,
+      151643
+    ],
+    &quot;encoder_no_repeat_ngram_size&quot;: null,
+    &quot;decoder_start_token_id&quot;: null,
+    &quot;is_assistant&quot;: null,
+    &quot;num_assistant_tokens&quot;: null,
+    &quot;num_assistant_tokens_schedule&quot;: null,
+    &quot;assistant_confidence_threshold&quot;: null,
+    &quot;prompt_lookup_num_tokens&quot;: null,
+    &quot;max_matching_ngram_size&quot;: null,
+    &quot;assistant_early_exit&quot;: null,
+    &quot;assistant_lookbehind&quot;: null,
+    &quot;target_lookbehind&quot;: null,
+    &quot;assistant_ensemble_weight&quot;: null,
+    &quot;speculation_type&quot;: null,
+    &quot;compile_config&quot;: null,
+    &quot;disable_compile&quot;: null,
+    &quot;continuous_batching_config&quot;: null,
+    &quot;low_memory&quot;: null,
+    &quot;penalty_alpha&quot;: null,
+    &quot;dola_layers&quot;: null,
+    &quot;diversity_penalty&quot;: null,
+    &quot;num_beam_groups&quot;: null,
+    &quot;constraints&quot;: null,
+    &quot;force_words_ids&quot;: null,
+    &quot;prefill_chunk_size&quot;: null,
+    &quot;_from_model_config&quot;: null,
+    &quot;transformers_version&quot;: &quot;5.23.0&quot;
+  }
+}</pre></details>
+  <h2>Evaluated examples</h2>
+  
+    <article>
+      <h3>MBPP 11
+        <span class="passed">PASS</span>
+      </h3>
+      <p>110 input tokens · 76 output tokens · Single Python code block</p>
+      <table><thead><tr><th scope='col'>Assertion</th><th scope='col'>Result</th><th scope='col'>Expected</th><th scope='col'>Status</th></tr></thead><tbody><tr><td>assert remove_Occ(&quot;hello&quot;,&quot;l&quot;) == &quot;heo&quot;</td><td>&#x27;heo&#x27;</td><td>&#x27;heo&#x27;</td><td>PASS</td></tr><tr><td>assert remove_Occ(&quot;abcda&quot;,&quot;a&quot;) == &quot;bcd&quot;</td><td>&#x27;bcd&#x27;</td><td>&#x27;bcd&#x27;</td><td>PASS</td></tr><tr><td>assert remove_Occ(&quot;PHP&quot;,&quot;P&quot;) == &quot;H&quot;</td><td>&#x27;H&#x27;</td><td>&#x27;H&#x27;</td><td>PASS</td></tr></tbody></table>
+      <details><summary>System prompt</summary><pre>You are a Python programming assistant.
+Write correct, executable Python code that solves the given task.
+Return only Python source code.
+Do not include Markdown code fences, explanations, tests, example calls, or print statements.</pre></details><details><summary>User prompt</summary><pre>Task:
+Write a python function to remove first and last occurrence of a given character from the string.
+
+Required function signature(s):
+def remove_Occ(s, ch):
+
+Implement the required function(s). You may include imports and helper functions if necessary.
+Return the complete implementation.</pre></details><details><summary>Model response</summary><pre>```python
+def remove_Occ(s, ch):
+    # Remove first occurrence of ch
+    s = s.replace(ch, &#x27;&#x27;, 1)
+    
+    # Check if ch is still present in the string
+    while ch in s:
+        # Remove all occurrences of ch
+        s = s.replace(ch, &#x27;&#x27;, s.count(ch))
+    
+    return s
+```</pre></details><details><summary>Tested solution</summary><pre>def remove_Occ(s, ch):
+    # Remove first occurrence of ch
+    s = s.replace(ch, &#x27;&#x27;, 1)
+    
+    # Check if ch is still present in the string
+    while ch in s:
+        # Remove all occurrences of ch
+        s = s.replace(ch, &#x27;&#x27;, s.count(ch))
+    
+    return s
+</pre></details><details><summary>Reference solution</summary><pre>def remove_Occ(s,ch): 
+    for i in range(len(s)): 
+        if (s[i] == ch): 
+            s = s[0 : i] + s[i + 1:] 
+            break
+    for i in range(len(s) - 1,-1,-1):  
+        if (s[i] == ch): 
+            s = s[0 : i] + s[i + 1:] 
+            break
+    return s </pre></details><details><summary>Input token IDs</summary><pre>[151644, 8948, 198, 2610, 525, 264, 13027, 15473, 17847, 624, 7985, 4396, 11, 32156, 13027, 2038, 429, 67477, 279, 2661, 3383, 624, 5598, 1172, 13027, 2530, 2038, 624, 5404, 537, 2924, 73192, 2038, 69155, 11, 40841, 11, 7032, 11, 3110, 6738, 11, 476, 1173, 12239, 13, 151645, 198, 151644, 872, 198, 6262, 510, 7985, 264, 10135, 729, 311, 4057, 1156, 323, 1537, 31559, 315, 264, 2661, 3668, 504, 279, 914, 382, 8164, 729, 11957, 1141, 982, 750, 4057, 2232, 638, 1141, 11, 521, 7731, 62980, 279, 2567, 729, 1141, 568, 1446, 1231, 2924, 15202, 323, 13137, 5746, 421, 5871, 624, 5598, 279, 4583, 8129, 13, 151645, 198, 151644, 77091, 198]</pre></details><details><summary>Output token IDs</summary><pre>[73594, 12669, 198, 750, 4057, 2232, 638, 1141, 11, 521, 982, 262, 671, 10783, 1156, 31559, 315, 521, 198, 262, 274, 284, 274, 6980, 7520, 11, 8981, 220, 16, 340, 1066, 262, 671, 4248, 421, 521, 374, 2058, 3042, 304, 279, 914, 198, 262, 1393, 521, 304, 274, 510, 286, 671, 10783, 678, 56015, 315, 521, 198, 286, 274, 284, 274, 6980, 7520, 11, 8981, 274, 6501, 7520, 1171, 1066, 262, 470, 274, 198, 73594, 151645]</pre></details>
+    </article>
+    
+    <article>
+      <h3>MBPP 12
+        <span class="failed">FAIL</span>
+      </h3>
+      <p>108 input tokens · 46 output tokens · Single Python code block</p>
+      <table><thead><tr><th scope='col'>Assertion</th><th scope='col'>Result</th><th scope='col'>Expected</th><th scope='col'>Status</th></tr></thead><tbody><tr><td>assert sort_matrix([[1, 2, 3], [2, 4, 5], [1, 1, 1]])==[[1, 1, 1], [1, 2, 3], [2, 4, 5]]</td><td>[[1, 2, 3], [2, 4, 5], [1, 1, 1]]</td><td>[[1, 1, 1], [1, 2, 3], [2, 4, 5]]</td><td>FAIL</td></tr><tr><td>assert sort_matrix([[1, 2, 3], [-2, 4, -5], [1, -1, 1]])==[[-2, 4, -5], [1, -1, 1], [1, 2, 3]]</td><td>[[1, 2, 3], [-5, -2, 4], [-1, 1, 1]]</td><td>[[-2, 4, -5], [1, -1, 1], [1, 2, 3]]</td><td>FAIL</td></tr><tr><td>assert sort_matrix([[5,8,9],[6,4,3],[2,1,4]])==[[2, 1, 4], [6, 4, 3], [5, 8, 9]]</td><td>[[5, 8, 9], [3, 4, 6], [1, 2, 4]]</td><td>[[2, 1, 4], [6, 4, 3], [5, 8, 9]]</td><td>FAIL</td></tr></tbody></table>
+      <details><summary>System prompt</summary><pre>You are a Python programming assistant.
+Write correct, executable Python code that solves the given task.
+Return only Python source code.
+Do not include Markdown code fences, explanations, tests, example calls, or print statements.</pre></details><details><summary>User prompt</summary><pre>Task:
+Write a function to sort a given matrix in ascending order according to the sum of its rows.
+
+Required function signature(s):
+def sort_matrix(M):
+
+Implement the required function(s). You may include imports and helper functions if necessary.
+Return the complete implementation.</pre></details><details><summary>Model response</summary><pre>```python
+from typing import List
+
+def sort_matrix(M: List[List[int]]) -&gt; List[List[int]]:
+    # Sort each row by sum in ascending order
+    return [sorted(row) for row in M]
+```</pre></details><details><summary>Tested solution</summary><pre>from typing import List
+
+def sort_matrix(M: List[List[int]]) -&gt; List[List[int]]:
+    # Sort each row by sum in ascending order
+    return [sorted(row) for row in M]
+</pre></details><details><summary>Reference solution</summary><pre>def sort_matrix(M):
+    result = sorted(M, key=sum)
+    return result</pre></details><details><summary>Input token IDs</summary><pre>[151644, 8948, 198, 2610, 525, 264, 13027, 15473, 17847, 624, 7985, 4396, 11, 32156, 13027, 2038, 429, 67477, 279, 2661, 3383, 624, 5598, 1172, 13027, 2530, 2038, 624, 5404, 537, 2924, 73192, 2038, 69155, 11, 40841, 11, 7032, 11, 3110, 6738, 11, 476, 1173, 12239, 13, 151645, 198, 151644, 872, 198, 6262, 510, 7985, 264, 729, 311, 3378, 264, 2661, 6172, 304, 35388, 1973, 4092, 311, 279, 2629, 315, 1181, 6978, 382, 8164, 729, 11957, 1141, 982, 750, 3378, 10193, 3189, 7731, 62980, 279, 2567, 729, 1141, 568, 1446, 1231, 2924, 15202, 323, 13137, 5746, 421, 5871, 624, 5598, 279, 4583, 8129, 13, 151645, 198, 151644, 77091, 198]</pre></details><details><summary>Output token IDs</summary><pre>[73594, 12669, 198, 1499, 19496, 1159, 1759, 271, 750, 3378, 10193, 3189, 25, 1759, 51994, 18640, 29616, 1464, 1759, 51994, 18640, 83320, 262, 671, 15967, 1817, 2802, 553, 2629, 304, 35388, 1973, 198, 262, 470, 508, 28298, 7835, 8, 369, 2802, 304, 386, 921, 73594, 151645]</pre></details>
+    </article>
+    
+    <article>
+      <h3>MBPP 13
+        <span class="failed">FAIL</span>
+      </h3>
+      <p>102 input tokens · 219 output tokens · Code with explanation</p>
+      <table><thead><tr><th scope='col'>Assertion</th><th scope='col'>Result</th><th scope='col'>Expected</th><th scope='col'>Status</th></tr></thead><tbody><tr><td>assert count_common([&#x27;red&#x27;,&#x27;green&#x27;,&#x27;black&#x27;,&#x27;pink&#x27;,&#x27;black&#x27;,&#x27;white&#x27;,&#x27;black&#x27;,&#x27;eyes&#x27;,&#x27;white&#x27;,&#x27;black&#x27;,&#x27;orange&#x27;,&#x27;pink&#x27;,&#x27;pink&#x27;,&#x27;red&#x27;,&#x27;red&#x27;,&#x27;white&#x27;,&#x27;orange&#x27;,&#x27;white&#x27;,&quot;black&quot;,&#x27;pink&#x27;,&#x27;green&#x27;,&#x27;green&#x27;,&#x27;pink&#x27;,&#x27;green&#x27;,&#x27;pink&#x27;,&#x27;white&#x27;,&#x27;orange&#x27;,&quot;orange&quot;,&#x27;red&#x27;]) == [(&#x27;pink&#x27;, 6), (&#x27;black&#x27;, 5), (&#x27;white&#x27;, 5), (&#x27;red&#x27;, 4)]</td><td>{&#x27;black&#x27;: 5, &#x27;eyes&#x27;: 1, &#x27;green&#x27;: 4, &#x27;orange&#x27;: 4, ...}</td><td>[(&#x27;pink&#x27;, 6), (&#x27;black&#x27;, 5), (&#x27;white&#x27;, 5), (&#x27;red&#x27;, 4)]</td><td>FAIL</td></tr><tr><td>assert count_common([&#x27;one&#x27;, &#x27;two&#x27;, &#x27;three&#x27;, &#x27;four&#x27;, &#x27;five&#x27;, &#x27;one&#x27;, &#x27;two&#x27;, &#x27;one&#x27;, &#x27;three&#x27;, &#x27;one&#x27;]) == [(&#x27;one&#x27;, 4), (&#x27;two&#x27;, 2), (&#x27;three&#x27;, 2), (&#x27;four&#x27;, 1)]</td><td>{&#x27;five&#x27;: 1, &#x27;four&#x27;: 1, &#x27;one&#x27;: 4, &#x27;three&#x27;: 2, ...}</td><td>[(&#x27;one&#x27;, 4), (&#x27;two&#x27;, 2), (&#x27;three&#x27;, 2), (&#x27;four&#x27;, 1)]</td><td>FAIL</td></tr><tr><td>assert count_common([&#x27;Facebook&#x27;, &#x27;Apple&#x27;, &#x27;Amazon&#x27;, &#x27;Netflix&#x27;, &#x27;Google&#x27;, &#x27;Apple&#x27;, &#x27;Netflix&#x27;, &#x27;Amazon&#x27;]) == [(&#x27;Apple&#x27;, 2), (&#x27;Amazon&#x27;, 2), (&#x27;Netflix&#x27;, 2), (&#x27;Facebook&#x27;, 1)]</td><td>{&#x27;Amazon&#x27;: 2, &#x27;Apple&#x27;: 2, &#x27;Facebook&#x27;: 1, &#x27;Google&#x27;: 1, ...}</td><td>[(&#x27;Apple&#x27;, 2), (&#x27;Amazon&#x27;, 2), (&#x27;Netflix&#x27;, 2), (&#x27;Facebook&#x27;, 1)]</td><td>FAIL</td></tr></tbody></table>
+      <details><summary>System prompt</summary><pre>You are a Python programming assistant.
+Write correct, executable Python code that solves the given task.
+Return only Python source code.
+Do not include Markdown code fences, explanations, tests, example calls, or print statements.</pre></details><details><summary>User prompt</summary><pre>Task:
+Write a function to count the most common words in a dictionary.
+
+Required function signature(s):
+def count_common(words):
+
+Implement the required function(s). You may include imports and helper functions if necessary.
+Return the complete implementation.</pre></details><details><summary>Model response</summary><pre>```python
+from collections import Counter
+
+def count_common(words):
+    &quot;&quot;&quot;
+    Counts the frequency of each word in the provided list and returns a dictionary with the top 10 most frequent words.
+    
+    Parameters:
+    words (list): A list of strings representing words.
+    
+    Returns:
+    dict: A dictionary where keys are the most common words and values are their frequencies.
+    &quot;&quot;&quot;
+    # Count the frequency of each word
+    freq = Counter(words)
+    
+    # Get the top 10 most common words
+    top_10 = freq.most_common(10)
+    
+    return dict(top_10)
+
+# Example usage
+words_list = [&quot;apple&quot;, &quot;banana&quot;, &quot;apple&quot;, &quot;orange&quot;, &quot;banana&quot;, &quot;apple&quot;]
+print(count_common(words_list))
+```
+
+This solution uses the `collections.Counter` class from the standard library to count the frequency of each word in the input list. It then retrieves the top 10 most common words using the `most_common()` method and converts the result into a dictionary for easy access.</pre></details><details><summary>Tested solution</summary><pre>from collections import Counter
+
+def count_common(words):
+    &quot;&quot;&quot;
+    Counts the frequency of each word in the provided list and returns a dictionary with the top 10 most frequent words.
+    
+    Parameters:
+    words (list): A list of strings representing words.
+    
+    Returns:
+    dict: A dictionary where keys are the most common words and values are their frequencies.
+    &quot;&quot;&quot;
+    # Count the frequency of each word
+    freq = Counter(words)
+    
+    # Get the top 10 most common words
+    top_10 = freq.most_common(10)
+    
+    return dict(top_10)
+
+# Example usage
+words_list = [&quot;apple&quot;, &quot;banana&quot;, &quot;apple&quot;, &quot;orange&quot;, &quot;banana&quot;, &quot;apple&quot;]
+print(count_common(words_list))
+</pre></details><details><summary>Reference solution</summary><pre>from collections import Counter
+def count_common(words):
+  word_counts = Counter(words)
+  top_four = word_counts.most_common(4)
+  return (top_four)
+</pre></details><details><summary>Input token IDs</summary><pre>[151644, 8948, 198, 2610, 525, 264, 13027, 15473, 17847, 624, 7985, 4396, 11, 32156, 13027, 2038, 429, 67477, 279, 2661, 3383, 624, 5598, 1172, 13027, 2530, 2038, 624, 5404, 537, 2924, 73192, 2038, 69155, 11, 40841, 11, 7032, 11, 3110, 6738, 11, 476, 1173, 12239, 13, 151645, 198, 151644, 872, 198, 6262, 510, 7985, 264, 729, 311, 1760, 279, 1429, 4185, 4244, 304, 264, 10997, 382, 8164, 729, 11957, 1141, 982, 750, 1760, 21107, 36289, 7731, 62980, 279, 2567, 729, 1141, 568, 1446, 1231, 2924, 15202, 323, 13137, 5746, 421, 5871, 624, 5598, 279, 4583, 8129, 13, 151645, 198, 151644, 77091, 198]</pre></details><details><summary>Output token IDs</summary><pre>[73594, 12669, 198, 1499, 15302, 1159, 19735, 271, 750, 1760, 21107, 36289, 982, 262, 3190, 262, 85659, 279, 11639, 315, 1817, 3409, 304, 279, 3897, 1140, 323, 4675, 264, 10997, 448, 279, 1909, 220, 16, 15, 1429, 20757, 4244, 624, 1066, 262, 13522, 510, 262, 4244, 320, 1607, 1648, 362, 1140, 315, 9069, 14064, 4244, 624, 1066, 262, 5184, 510, 262, 6451, 25, 362, 10997, 1380, 6894, 525, 279, 1429, 4185, 4244, 323, 2750, 525, 862, 33773, 624, 262, 3190, 262, 671, 4504, 279, 11639, 315, 1817, 3409, 198, 262, 20895, 284, 19735, 36289, 340, 1066, 262, 671, 2126, 279, 1909, 220, 16, 15, 1429, 4185, 4244, 198, 262, 1909, 62, 16, 15, 284, 20895, 744, 535, 21107, 7, 16, 15, 340, 1066, 262, 470, 6451, 17634, 62, 16, 15, 692, 2, 13383, 10431, 198, 5761, 2019, 284, 4383, 22377, 497, 330, 87747, 497, 330, 22377, 497, 330, 34164, 497, 330, 87747, 497, 330, 22377, 7026, 1350, 11512, 21107, 36289, 2019, 1171, 13874, 19324, 1986, 6291, 5711, 279, 1565, 51137, 86291, 63, 536, 504, 279, 5297, 6733, 311, 1760, 279, 11639, 315, 1817, 3409, 304, 279, 1946, 1140, 13, 1084, 1221, 70671, 279, 1909, 220, 16, 15, 1429, 4185, 4244, 1667, 279, 1565, 3562, 21107, 54258, 1714, 323, 32722, 279, 1102, 1119, 264, 10997, 369, 4135, 2615, 13, 151645]</pre></details>
+    </article>
+    
+    <article>
+      <h3>MBPP 14
+        <span class="passed">PASS</span>
+      </h3>
+      <p>107 input tokens · 106 output tokens · Single Python code block</p>
+      <table><thead><tr><th scope='col'>Assertion</th><th scope='col'>Result</th><th scope='col'>Expected</th><th scope='col'>Status</th></tr></thead><tbody><tr><td>assert find_Volume(10,8,6) == 240</td><td>240.0</td><td>240</td><td>PASS</td></tr><tr><td>assert find_Volume(3,2,2) == 6</td><td>6.0</td><td>6</td><td>PASS</td></tr><tr><td>assert find_Volume(1,2,1) == 1</td><td>1.0</td><td>1</td><td>PASS</td></tr></tbody></table>
+      <details><summary>System prompt</summary><pre>You are a Python programming assistant.
+Write correct, executable Python code that solves the given task.
+Return only Python source code.
+Do not include Markdown code fences, explanations, tests, example calls, or print statements.</pre></details><details><summary>User prompt</summary><pre>Task:
+Write a python function to find the volume of a triangular prism.
+
+Required function signature(s):
+def find_Volume(l, b, h):
+
+Implement the required function(s). You may include imports and helper functions if necessary.
+Return the complete implementation.</pre></details><details><summary>Model response</summary><pre>```python
+def find_Volume(l, b, h):
+    &quot;&quot;&quot;
+    Calculate the volume of a triangular prism using its length (l), base width (b),
+    and height (h).
+    
+    Parameters:
+    l (float): Length of the prism.
+    b (float): Base width of the triangular face.
+    h (float): Height of the prism.
+    
+    Returns:
+    float: Volume of the triangular prism.
+    &quot;&quot;&quot;
+    return 0.5 * l * b * h
+```</pre></details><details><summary>Tested solution</summary><pre>def find_Volume(l, b, h):
+    &quot;&quot;&quot;
+    Calculate the volume of a triangular prism using its length (l), base width (b),
+    and height (h).
+    
+    Parameters:
+    l (float): Length of the prism.
+    b (float): Base width of the triangular face.
+    h (float): Height of the prism.
+    
+    Returns:
+    float: Volume of the triangular prism.
+    &quot;&quot;&quot;
+    return 0.5 * l * b * h
+</pre></details><details><summary>Reference solution</summary><pre>def find_Volume(l,b,h) : 
+    return ((l * b * h) / 2) </pre></details><details><summary>Input token IDs</summary><pre>[151644, 8948, 198, 2610, 525, 264, 13027, 15473, 17847, 624, 7985, 4396, 11, 32156, 13027, 2038, 429, 67477, 279, 2661, 3383, 624, 5598, 1172, 13027, 2530, 2038, 624, 5404, 537, 2924, 73192, 2038, 69155, 11, 40841, 11, 7032, 11, 3110, 6738, 11, 476, 1173, 12239, 13, 151645, 198, 151644, 872, 198, 6262, 510, 7985, 264, 10135, 729, 311, 1477, 279, 8123, 315, 264, 65494, 93610, 382, 8164, 729, 11957, 1141, 982, 750, 1477, 2334, 4661, 2333, 11, 293, 11, 305, 7731, 62980, 279, 2567, 729, 1141, 568, 1446, 1231, 2924, 15202, 323, 13137, 5746, 421, 5871, 624, 5598, 279, 4583, 8129, 13, 151645, 198, 151644, 77091, 198]</pre></details><details><summary>Output token IDs</summary><pre>[73594, 12669, 198, 750, 1477, 2334, 4661, 2333, 11, 293, 11, 305, 982, 262, 3190, 262, 20517, 279, 8123, 315, 264, 65494, 93610, 1667, 1181, 3084, 320, 75, 701, 2331, 2374, 320, 65, 1326, 262, 323, 2608, 320, 71, 4292, 1066, 262, 13522, 510, 262, 326, 320, 3649, 1648, 17287, 315, 279, 93610, 624, 262, 293, 320, 3649, 1648, 5351, 2374, 315, 279, 65494, 3579, 624, 262, 305, 320, 3649, 1648, 21432, 315, 279, 93610, 624, 1066, 262, 5184, 510, 262, 2224, 25, 20265, 315, 279, 65494, 93610, 624, 262, 3190, 262, 470, 220, 15, 13, 20, 353, 326, 353, 293, 353, 305, 198, 73594, 151645]</pre></details>
+    </article>
+    
+    <article>
+      <h3>MBPP 15
+        <span class="failed">FAIL</span>
+      </h3>
+      <p>101 input tokens · 24 output tokens · Single Python code block</p>
+      <table><thead><tr><th scope='col'>Assertion</th><th scope='col'>Result</th><th scope='col'>Expected</th><th scope='col'>Status</th></tr></thead><tbody><tr><td>assert split_lowerstring(&quot;AbCd&quot;)==[&#x27;bC&#x27;,&#x27;d&#x27;]</td><td>[&#x27;A&#x27;, &#x27;C&#x27;, &#x27;&#x27;]</td><td>[&#x27;bC&#x27;, &#x27;d&#x27;]</td><td>FAIL</td></tr><tr><td>assert split_lowerstring(&quot;Python&quot;)==[&#x27;y&#x27;, &#x27;t&#x27;, &#x27;h&#x27;, &#x27;o&#x27;, &#x27;n&#x27;]</td><td>[&#x27;P&#x27;, &#x27;&#x27;, &#x27;&#x27;, &#x27;&#x27;, &#x27;&#x27;, &#x27;&#x27;]</td><td>[&#x27;y&#x27;, &#x27;t&#x27;, &#x27;h&#x27;, &#x27;o&#x27;, &#x27;n&#x27;]</td><td>FAIL</td></tr><tr><td>assert split_lowerstring(&quot;Programming&quot;)==[&#x27;r&#x27;, &#x27;o&#x27;, &#x27;g&#x27;, &#x27;r&#x27;, &#x27;a&#x27;, &#x27;m&#x27;, &#x27;m&#x27;, &#x27;i&#x27;, &#x27;n&#x27;, &#x27;g&#x27;]</td><td>[&#x27;P&#x27;, &#x27;&#x27;, &#x27;&#x27;, &#x27;&#x27;, &#x27;&#x27;, &#x27;&#x27;, ...]</td><td>[&#x27;r&#x27;, &#x27;o&#x27;, &#x27;g&#x27;, &#x27;r&#x27;, &#x27;a&#x27;, &#x27;m&#x27;, ...]</td><td>FAIL</td></tr></tbody></table>
+      <details><summary>System prompt</summary><pre>You are a Python programming assistant.
+Write correct, executable Python code that solves the given task.
+Return only Python source code.
+Do not include Markdown code fences, explanations, tests, example calls, or print statements.</pre></details><details><summary>User prompt</summary><pre>Task:
+Write a function to split a string at lowercase letters.
+
+Required function signature(s):
+def split_lowerstring(text):
+
+Implement the required function(s). You may include imports and helper functions if necessary.
+Return the complete implementation.</pre></details><details><summary>Model response</summary><pre>```python
+import re
+
+def split_lowerstring(text):
+    return re.split(&#x27;[a-z]&#x27;, text)
+```</pre></details><details><summary>Tested solution</summary><pre>import re
+
+def split_lowerstring(text):
+    return re.split(&#x27;[a-z]&#x27;, text)
+</pre></details><details><summary>Reference solution</summary><pre>import re
+def split_lowerstring(text):
+ return (re.findall(&#x27;[a-z][^a-z]*&#x27;, text))</pre></details><details><summary>Input token IDs</summary><pre>[151644, 8948, 198, 2610, 525, 264, 13027, 15473, 17847, 624, 7985, 4396, 11, 32156, 13027, 2038, 429, 67477, 279, 2661, 3383, 624, 5598, 1172, 13027, 2530, 2038, 624, 5404, 537, 2924, 73192, 2038, 69155, 11, 40841, 11, 7032, 11, 3110, 6738, 11, 476, 1173, 12239, 13, 151645, 198, 151644, 872, 198, 6262, 510, 7985, 264, 729, 311, 6718, 264, 914, 518, 42047, 11931, 382, 8164, 729, 11957, 1141, 982, 750, 6718, 30425, 917, 7235, 7731, 62980, 279, 2567, 729, 1141, 568, 1446, 1231, 2924, 15202, 323, 13137, 5746, 421, 5871, 624, 5598, 279, 4583, 8129, 13, 151645, 198, 151644, 77091, 198]</pre></details><details><summary>Output token IDs</summary><pre>[73594, 12669, 198, 474, 312, 271, 750, 6718, 30425, 917, 7235, 982, 262, 470, 312, 5289, 20582, 64, 9141, 27838, 1467, 340, 73594, 151645]</pre></details>
+    </article>
+    
+</main>
+</body>
+</html>

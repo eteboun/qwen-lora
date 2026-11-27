@@ -148,7 +148,7 @@ def profile_training_memory(
     torch.cuda.reset_peak_memory_stats(device=0)
     trainer.train()
 
-    resolved_lora_config = lora_config.to_dict()
+    resolved_lora_config = trainer.model.active_peft_config.to_dict()
     for key, value in resolved_lora_config.items():
         if isinstance(value, set):
             resolved_lora_config[key] = sorted(value)
@@ -159,7 +159,7 @@ def profile_training_memory(
         "revision": revision,
         "dtype": str(dtype),
         "gpu_name": torch.cuda.get_device_name(0),
-        "sft_config": sft_config.to_dict(),
+        "sft_config": trainer.args.to_dict(),
         "lora_config": resolved_lora_config,
         "measurements": asdict(measure),
     }

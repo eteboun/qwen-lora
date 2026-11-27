@@ -120,7 +120,7 @@ def _is_python(text: str) -> bool:
     )
 
 
-def _completion_format(text: str) -> str:
+def classify_completion_format(text: str) -> str:
     fenced_text = text.strip()
     blocks = list(PYTHON_FENCE.finditer(fenced_text))
     if not blocks:
@@ -195,7 +195,7 @@ def analyze_rows(dataset, tokenizer) -> list[RowAnalysis]:
                 prompt_tokens=len(prompt),
                 completion_tokens=len(completion),
                 total_tokens=len(chat),
-                completion_format=_completion_format(text),
+                completion_format=classify_completion_format(text),
                 starts_with_markdown=bool(FENCE_START.match(text.lstrip())),
                 prompt_requests_explanation=explanation is not None,
                 prompt_requests_markdown=markdown is not None,

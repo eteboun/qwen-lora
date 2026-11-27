@@ -4,6 +4,7 @@ import json
 import re
 import shutil
 import subprocess
+from collections import Counter
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
@@ -12,14 +13,16 @@ from uuid import uuid4
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
 
+from analyze_data import COMPLETION_FORMATS, FENCE_START, classify_completion_format
 from dataset_loader import load_mbpp_dataset
-from project_config import MODEL_ID
-from report import write_report
+from project_config import MBPP_REVISION, MODEL_ID, MODEL_REVISION
+from report import MBPP_RUNS_DIR, write_report
 
 
 DOCKER_IMAGE = "python:3.14-slim"
 SANDBOX_TIMEOUT = 15
 TESTS_PASSED = 42
+TEST_RUNNER_PATH = Path(__file__).resolve().with_name("mbpp_test_runner.py")
 
 SYSTEM_PROMPT = """You are a Python programming assistant.
 Write correct, executable Python code that solves the given task.
@@ -35,70 +38,7 @@ Required function signature(s):
 Implement the required function(s). You may include imports and helper functions if necessary.
 Return the complete implementation."""
 
-# Run the solution and MBPP assertions in a fresh process for each task.
-TEST_RUNNER = """
-import ast
-import contextlib
-import json
-import os
-import reprlib
-import resource
-import sys
-
-resource.setrlimit(resource.RLIMIT_CPU, (3, 3))
-resource.setrlimit(resource.RLIMIT_AS, (512 * 1024**2, 512 * 1024**2))
-resource.setrlimit(resource.RLIMIT_FSIZE, (1024**2, 1024**2))
-resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
-setup, solution, tests = json.load(sys.stdin)
-namespace = {"__name__": "__mbpp__"}
-
-def evaluate(expression):
-    return eval(compile(ast.Expression(expression), "<mbpp>", "eval"), namespace)
-
-def describe_error(error):
-    return f"{type(error).__name__}: {reprlib.repr(str(error))}"
-
-def compare(source):
-    record = {"assertion": source, "result": None, "expected": None, "passed": False}
-    try:
-        tree = ast.parse(source)
-        if len(tree.body) == 1 and isinstance(tree.body[0], ast.Assert):
-            condition = tree.body[0].test
-            if isinstance(condition, ast.Compare) and len(condition.ops) == 1 and isinstance(condition.ops[0], ast.Eq):
-                record["expected"] = ast.unparse(condition.comparators[0])
-                actual = evaluate(condition.left)
-                expected = evaluate(condition.comparators[0])
-                record["passed"] = bool(actual == expected)
-                record.update(result=reprlib.repr(actual), expected=reprlib.repr(expected))
-            else:
-                record["expected"] = "True"
-                record["passed"] = bool(evaluate(condition))
-                record["result"] = str(record["passed"])
-        else:
-            record["expected"] = "No exception"
-            exec(compile(tree, "<mbpp>", "exec"), namespace)
-            record.update(result="No exception", passed=True)
-    except Exception as error:
-        record["error"] = describe_error(error)
-    return record
-
-records = []
-execution_error = None
-with open(os.devnull, "w") as quiet, contextlib.redirect_stdout(quiet), contextlib.redirect_stderr(quiet):
-    try:
-        for source in (setup, solution):
-            exec(compile(source, "<mbpp>", "exec"), namespace)
-    except Exception as error:
-        execution_error = describe_error(error)
-    else:
-        records = [compare(source) for source in tests]
-
-print(json.dumps({"tests": records, "execution_error": execution_error}))
-sys.exit(42 if execution_error is None and all(test["passed"] for test in records) else 1)
-"""
-
-
-def run_in_sandbox(docker, script, payload=None):
+def run_in_sandbox(docker, payload=None):
     name = f"mbpp-{uuid4().hex}"
     command = [
         docker, "run", "--rm", "--interactive", "--name", name, "--pull", "never",
@@ -107,8 +47,15 @@ def run_in_sandbox(docker, script, payload=None):
         "--memory", "512m", "--memory-swap", "512m", "--cpus", "1",
         "--pids-limit", "16", "--log-driver", "none",
         "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777",
-        "--workdir", "/tmp", DOCKER_IMAGE, "python", "-I", "-B", "-c", script,
+        "--workdir", "/tmp",
     ]
+    if payload is None:
+        command.extend([DOCKER_IMAGE, "python", "-I", "-B", "-c", "pass"])
+    else:
+        command.extend([
+            "--mount", f"type=bind,source={TEST_RUNNER_PATH},target=/runner.py,readonly",
+            DOCKER_IMAGE, "python", "-I", "-B", "/runner.py",
+        ])
     try:
         return subprocess.run(
             command,
@@ -131,7 +78,7 @@ def run_in_sandbox(docker, script, payload=None):
 def evaluate_tests(docker, solution, example):
     payload = json.dumps([example["test_setup_code"], solution, example["test_list"]])
     try:
-        result = run_in_sandbox(docker, TEST_RUNNER, payload)
+        result = run_in_sandbox(docker, payload)
     except subprocess.TimeoutExpired:
         return {"passed": False, "tests": [], "execution_error": "Test execution timed out."}
     if result.returncode in (125, 126, 127):
@@ -157,7 +104,9 @@ def extract_signatures(reference_code, tests):
             for node in ast.walk(ast.parse(test))
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
         }
-        functions = [function for function in functions if function.name in called_names]
+        functions = [function
+         for function in functions
+           if function.name in called_names]
 
     signatures = []
     for function in functions:
@@ -183,7 +132,8 @@ def generate_solution(model, tokenizer, example, generation_config: GenerationCo
         return_tensors="pt",
     ).to(model.device)
     with torch.inference_mode():
-        output = model.generate(**inputs, generation_config=generation_config)
+        output = model.generate(**inputs,
+         generation_config=generation_config)
     input_token_ids = inputs["input_ids"][0].tolist()
     output_token_ids = output[0, len(input_token_ids):].tolist()
     answer = tokenizer.decode(output_token_ids, skip_special_tokens=True)
@@ -195,39 +145,72 @@ def generate_solution(model, tokenizer, example, generation_config: GenerationCo
         "input_token_ids": input_token_ids,
         "output_token_ids": output_token_ids,
         "output_text": answer,
+        "completion_format": classify_completion_format(answer),
+        "starts_with_markdown": bool(FENCE_START.match(answer.lstrip())),
         "solution": "\n\n".join(blocks) if blocks else answer.strip(),
+        "reference_solution": example["code"],
     }
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Measure MBPP pass@1 before SFT.")
-    parser.add_argument("--limit", type=int, default=10, help="Number of examples from the test split.")
-    parser.add_argument("--note", default="", help="Free-form note shown at the top of the HTML report.")
+    parser = argparse.ArgumentParser(description="Measure MBPP pass@1 for the base model or a trained checkpoint.")
+    parser.add_argument(
+        "--limit", type=int, default=10, help="Number of examples from the test split.",
+    )
+    parser.add_argument(
+        "--note", default="", help="Free-form note shown at the top of the HTML report.",
+    )
+    checkpoint = parser.add_mutually_exclusive_group()
+    checkpoint.add_argument("--adapter", type=Path, help="Local PEFT LoRA adapter directory.")
+    checkpoint.add_argument("--model-path", type=Path, help="Local directory containing the full model weights.")
     args = parser.parse_args()
     if args.limit < 1:
         parser.error("--limit must be at least 1.")
+    if args.adapter is not None and not (args.adapter / "adapter_config.json").is_file():
+        parser.error("--adapter must contain adapter_config.json.")
+    if args.model_path is not None and not (args.model_path / "config.json").is_file():
+        parser.error("--model-path must contain config.json.")
 
     docker = shutil.which("docker")
     if docker is None:
         raise SystemExit("Docker is required to run MBPP tests.")
+
     try:
-        probe = run_in_sandbox(docker, "pass")
+        docker_probe = run_in_sandbox(docker)
     except subprocess.TimeoutExpired as error:
         raise SystemExit("Docker timed out while starting the MBPP test container.") from error
-    if probe.returncode:
+    if docker_probe.returncode:
         raise SystemExit(
             f"Could not start the MBPP test container. Check Docker and run 'docker pull {DOCKER_IMAGE}'.\n"
-            f"{probe.stderr.strip()}"
+            f"{docker_probe.stderr.strip()}"
         )
+
     if not torch.cuda.is_available():
         raise SystemExit("PyTorch cannot access CUDA. Run the script in a GPU-enabled WSL session.")
 
-    test_split = load_mbpp_dataset()["test"]
-    examples = test_split.select(range(min(args.limit, len(test_split))))
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, local_files_only=True)
+    test_split = load_mbpp_dataset(revision=MBPP_REVISION)["test"]
+    num_examples = min(args.limit, len(test_split))
+    examples = test_split.select(range(num_examples))
+
+    tokenizer = AutoTokenizer.from_pretrained(
+        MODEL_ID,
+        revision=MODEL_REVISION,
+        local_files_only=True,
+    )
+    model_source = MODEL_ID if args.model_path is None else str(args.model_path.resolve())
+    model_revision = MODEL_REVISION if args.model_path is None else None
     model = AutoModelForCausalLM.from_pretrained(
-        MODEL_ID, local_files_only=True, dtype=torch.float16, device_map=0,
-    ).eval()
+        model_source,
+        revision=model_revision,
+        local_files_only=True,
+        dtype=torch.float16,
+        device_map=0,
+    )
+    if args.adapter is not None:
+        from peft import PeftModel
+
+        model = PeftModel.from_pretrained(model, str(args.adapter.resolve()), local_files_only=True)
+    model.eval()
     generation_config = deepcopy(model.generation_config)
     generation_config.update(
         max_new_tokens=512,
@@ -236,15 +219,27 @@ def main():
     )
 
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
-    run_dir = Path(__file__).resolve().parent / "baseline_runs" / timestamp
+    run_kind = "sft" if args.adapter is not None or args.model_path is not None else "baseline"
+    run_dir = MBPP_RUNS_DIR / timestamp
     run_dir.mkdir(parents=True)
+
     config = {
         "note": args.note,
-        "model_id": MODEL_ID,
+        "run_kind": run_kind,
+        "model_id": model_source,
+        "model_revision": model_revision,
+        "adapter_path": str(args.adapter.resolve()) if args.adapter is not None else None,
+        "tokenizer_id": MODEL_ID,
+        "tokenizer_revision": MODEL_REVISION,
         "model_dtype": str(model.dtype),
-        "dataset": {"id": "google-research-datasets/mbpp", "config": "full", "split": "test"},
+        "dataset": {
+            "id": "google-research-datasets/mbpp",
+            "config": "full",
+            "split": "test",
+            "revision": MBPP_REVISION,
+        },
         "limit": args.limit,
-        "num_examples": len(examples),
+        "num_examples": num_examples,
         "docker_image": DOCKER_IMAGE,
         "sandbox_timeout_seconds": SANDBOX_TIMEOUT,
         "generation_config": generation_config.to_dict(),
@@ -252,22 +247,34 @@ def main():
     (run_dir / "config.json").write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
     print(f"Saving results to {run_dir}", flush=True)
 
-    passed = 0
+    passed_count = 0
+    completion_formats = Counter(dict.fromkeys(COMPLETION_FORMATS, 0))
+    starts_with_markdown_count = 0
     with (run_dir / "examples.jsonl").open("w", encoding="utf-8") as results:
         for example in examples:
             record = generate_solution(model, tokenizer, example, generation_config)
             record.update(evaluate_tests(docker, record["solution"], example))
-            success = record["passed"]
             results.write(json.dumps(record, ensure_ascii=False) + "\n")
             results.flush()
-            passed += success
-            print(f"MBPP {example['task_id']}: {'PASS' if success else 'FAIL'}", flush=True)
+            passed_count += record["passed"]
+            completion_formats[record["completion_format"]] += 1
+            starts_with_markdown_count += record["starts_with_markdown"]
+            status = "PASS" if record["passed"] else "FAIL"
+            print(f"MBPP {example['task_id']}: {status}", flush=True)
 
-    pass_at_1 = passed / len(examples)
-    summary = {"passed": passed, "total": len(examples), "pass_at_1": pass_at_1}
+    pass_at_1 = passed_count / num_examples
+    summary = {
+        "passed": passed_count,
+        "total": num_examples,
+        "pass_at_1": pass_at_1,
+        "completion_formats": dict(completion_formats),
+        "starts_with_markdown_count": starts_with_markdown_count,
+    }
     (run_dir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
-    print(f"pass@1: {passed}/{len(examples)} ({pass_at_1:.1%})")
-    print(f"HTML report: {write_report(run_dir)}")
+    print(f"pass@1: {passed_count}/{num_examples} ({pass_at_1:.1%})")
+
+    report_path = write_report(run_dir)
+    print(f"HTML report: {report_path}")
 
 
 if __name__ == "__main__":

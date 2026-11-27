@@ -6,7 +6,13 @@ from pathlib import Path
 from urllib.parse import quote
 
 
-RUNS_DIR = Path(__file__).resolve().parent / "baseline_runs"
+MBPP_RUNS_DIR = Path(__file__).resolve().parent / "mbpp_runs"
+COMPLETION_FORMAT_LABELS = {
+    "raw_python": "Raw Python",
+    "single_markdown_python": "Single Python code block",
+    "code_with_explanation": "Code with explanation",
+    "other": "Other",
+}
 
 
 def read_json(path):
@@ -45,6 +51,10 @@ def render_example(example):
     passed = example["passed"]
     input_ids = example["input_token_ids"]
     output_ids = example["output_token_ids"]
+    format_suffix = ""
+    if "completion_format" in example:
+        format_label = COMPLETION_FORMAT_LABELS[example["completion_format"]]
+        format_suffix = f" · {escape(format_label)}"
     sections = []
     if "system_prompt" in example:
         sections.append(details("System prompt", example["system_prompt"]))
@@ -52,6 +62,10 @@ def render_example(example):
         details("User prompt", example["prompt"]),
         details("Model response", example["output_text"]),
         details("Tested solution", example["solution"]),
+    ])
+    if "reference_solution" in example:
+        sections.append(details("Reference solution", example["reference_solution"]))
+    sections.extend([
         details("Input token IDs", json.dumps(input_ids)),
         details("Output token IDs", json.dumps(output_ids)),
     ])
@@ -60,7 +74,7 @@ def render_example(example):
       <h3>MBPP {escape(str(example["task_id"]))}
         <span class="{'passed' if passed else 'failed'}">{'PASS' if passed else 'FAIL'}</span>
       </h3>
-      <p>{len(input_ids)} input tokens · {len(output_ids)} output tokens</p>
+      <p>{len(input_ids)} input tokens · {len(output_ids)} output tokens{format_suffix}</p>
       {render_tests(example)}
       {''.join(sections)}
     </article>
@@ -76,14 +90,32 @@ def write_report(run_dir):
             examples = [json.loads(line) for line in results if line.strip()]
 
     summary_path = run_dir / "summary.json"
+    format_overview = ""
     if summary_path.exists():
         summary = read_json(summary_path)
         score = f'{summary["pass_at_1"]:.1%} pass@1 · {summary["passed"]}/{summary["total"]} passed'
+        if "completion_formats" in summary:
+            counts = [
+                (COMPLETION_FORMAT_LABELS[name], count)
+                for name, count in summary["completion_formats"].items()
+            ]
+            counts.append(("Starts with a Markdown fence", summary["starts_with_markdown_count"]))
+            format_rows = "".join(
+                f'<tr><th scope="row">{escape(label)}</th><td>{count:,}</td>'
+                f'<td>{count / summary["total"]:.1%}</td></tr>'
+                for label, count in counts
+            )
+            format_overview = (
+                '<h2>Response formats</h2><table><thead><tr><th scope="col">Measure</th>'
+                '<th scope="col">Count</th><th scope="col">Share</th></tr></thead>'
+                f'<tbody>{format_rows}</tbody></table>'
+            )
     else:
         passed = sum(example["passed"] for example in examples)
         score = f'Incomplete run · {passed} passed · {len(examples)}/{config["num_examples"]} evaluated'
 
     dataset = config["dataset"]
+    title = "MBPP trained model evaluation" if config.get("run_kind") == "sft" else "MBPP baseline"
     note = config.get("note", "").strip()
     note_html = f'<p class="run-note">{escape(note)}</p>' if note else ""
     report = f"""<!doctype html>
@@ -91,7 +123,7 @@ def write_report(run_dir):
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MBPP baseline · {escape(run_dir.name)}</title>
+  <title>{title} · {escape(run_dir.name)}</title>
   <style>
     :root {{ color-scheme: light dark; font-family: system-ui, sans-serif; }}
     body {{ max-width: 58rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }}
@@ -115,13 +147,14 @@ def write_report(run_dir):
 </head>
 <body>
 <header>
-  <h1>MBPP baseline</h1>
+  <h1>{title}</h1>
   {note_html}
   <p><strong>{escape(score)}</strong></p>
   <p>{escape(config["model_id"])} · {escape(dataset["id"])} · {escape(dataset["config"])} / {escape(dataset["split"])}</p>
   <p>Run: <time>{escape(run_dir.name)}</time></p>
 </header>
 <main>
+  {format_overview}
   {details("Run configuration", json.dumps(config, indent=2, ensure_ascii=False))}
   <h2>Evaluated examples</h2>
   {''.join(render_example(example) for example in examples) or '<p>No examples recorded yet.</p>'}
@@ -367,13 +400,7 @@ def write_analysis_report(analysis_path: Path) -> Path:
             + "".join(f"<td>{value}</td>" for value in cells) + "</tr>"
         )
 
-    format_labels = {
-        "raw_python": "Raw Python",
-        "single_markdown_python": "Single Python code block",
-        "code_with_explanation": "Code with explanation",
-        "other": "Other",
-    }
-    counts = [(format_labels[name], count) for name, count in analysis["completion_formats"].items()]
+    counts = [(COMPLETION_FORMAT_LABELS[name], count) for name, count in analysis["completion_formats"].items()]
     counts.extend([
         ("Completion starts with a Markdown fence", analysis["starts_with_markdown_count"]),
         ("Prompt requests an explanation", analysis["prompt_explanation_request_count"]),
@@ -619,14 +646,14 @@ def write_memory_profile_report(profile_path: Path) -> Path:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate HTML reports from baseline run JSON files.")
-    parser.add_argument("run_dir", nargs="?", type=Path, help="Run directory. Defaults to all baseline runs.")
+    parser = argparse.ArgumentParser(description="Generate HTML reports from MBPP run JSON files.")
+    parser.add_argument("run_dir", nargs="?", type=Path, help="Run directory. Defaults to all MBPP runs.")
     args = parser.parse_args()
     run_dirs = [args.run_dir] if args.run_dir else [
-        config_path.parent for config_path in sorted(RUNS_DIR.glob("*/config.json"))
+        config_path.parent for config_path in sorted(MBPP_RUNS_DIR.glob("*/config.json"))
     ]
     if not run_dirs:
-        parser.error(f"No baseline runs found in {RUNS_DIR}.")
+        parser.error(f"No MBPP runs found in {MBPP_RUNS_DIR}.")
     for run_dir in run_dirs:
         try:
             output = write_report(run_dir)
